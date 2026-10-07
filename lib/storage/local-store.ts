@@ -42,14 +42,43 @@ export interface LocalDatabase {
   collections: LocalCollection[];
 }
 
+export type Person = {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Loan = {
+  id: string;
+  personId: string;
+  loanAmount: number;
+  loanDate: string;
+  dailyInstallment: number | null;
+  status: 'ACTIVE' | 'COMPLETED';
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Collection = {
+  id: string;
+  loanId: string;
+  personId: string;
+  amount: number;
+  collectedAt: Date;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 const DB_FILE = path.join(process.cwd(), 'data', 'local-db.json');
 
 export function isLocalMode(): boolean {
-  const url = process.env.DATABASE_URL;
-  if (!url || url.trim() === '') return true;
-  // If set to default placeholder localhost, run local mode
-  if (url.includes('localhost') || url.includes('127.0.0.1')) return true;
-  return false;
+  return true;
 }
 
 function generateInitialData(): LocalDatabase {

@@ -15,10 +15,7 @@ export default async function DashboardPage() {
     summary = await getDashboardSummary();
   } catch (err: unknown) {
     console.error('Failed to load dashboard data:', err);
-    errorMsg =
-      err instanceof Error && err.message.includes('DATABASE_URL')
-        ? 'Database not connected. Please configure DATABASE_URL in .env.local to get started.'
-        : 'Unable to connect to database. Please verify your Supabase connection.';
+    errorMsg = err instanceof Error ? err.message : 'Unable to load dashboard data.';
   }
 
   const todayFormatted = format(new Date(), 'EEEE, dd MMMM');
@@ -32,16 +29,9 @@ export default async function DashboardPage() {
 
       <div className="p-4 space-y-6">
         {errorMsg ? (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-900 shadow-sm space-y-2">
-            <h3 className="font-bold text-base">Setup Required</h3>
+          <div className="rounded-2xl border border-red-300 bg-red-50 p-5 text-red-900 shadow-sm space-y-2">
+            <h3 className="font-bold text-base">Error Loading Data</h3>
             <p className="text-sm leading-relaxed">{errorMsg}</p>
-            <div className="rounded-xl bg-amber-100/70 p-3 text-xs font-mono text-amber-950">
-              1. Add DATABASE_URL in .env.local
-              <br />
-              2. Run: npm run db:push
-              <br />
-              3. Run: npm run db:seed
-            </div>
           </div>
         ) : summary ? (
           <>
