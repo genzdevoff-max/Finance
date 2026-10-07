@@ -1,0 +1,280 @@
+{
+  "people": [
+    {
+      "id": "ea87c3d9-56f1-48b0-9d90-3df245536730",
+      "fullName": "Ramesh Kumar",
+      "phone": "+91 98765 43210",
+      "address": "Shop #12, Main Market",
+      "notes": "Vegetable vendor, daily morning collection",
+      "createdAt": "2026-10-07T16:17:53.725Z",
+      "updatedAt": "2026-10-07T16:17:53.726Z"
+    },
+    {
+      "id": "dcb115fa-2a0a-4779-9034-4698f5ee8082",
+      "fullName": "Priya Sharma",
+      "phone": "+91 98111 22334",
+      "address": "Flat 402, Shanti Vihar",
+      "notes": "Boutique owner",
+      "createdAt": "2026-10-07T16:17:53.726Z",
+      "updatedAt": "2026-10-07T16:17:53.726Z"
+    },
+    {
+      "id": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "fullName": "Suresh Patel",
+      "phone": "+91 97222 33445",
+      "address": "Near Old Bus Stand",
+      "notes": "Tea stall owner, reliable daily payer",
+      "createdAt": "2026-10-07T16:17:53.726Z",
+      "updatedAt": "2026-10-07T16:17:53.726Z"
+    },
+    {
+      "id": "1ba8de02-47f9-4a36-8e56-891b86375794",
+      "fullName": "Anjali Verma",
+      "phone": "+91 99333 44556",
+      "address": "Block C, Rohini",
+      "notes": "Tailoring business",
+      "createdAt": "2026-10-07T16:17:53.726Z",
+      "updatedAt": "2026-10-07T16:17:53.726Z"
+    },
+    {
+      "id": "10ec6bf3-ede1-4e06-a082-b99909ef6464",
+      "fullName": "Rajesh Gupta",
+      "phone": "+91 98444 55667",
+      "address": "Gali 4, Karol Bagh",
+      "notes": "Grocery store owner",
+      "createdAt": "2026-10-07T16:17:53.726Z",
+      "updatedAt": "2026-10-07T16:17:53.726Z"
+    },
+    {
+      "id": "04f02e78-0771-4686-94fc-564aa30bf51a",
+      "fullName": "santhosh",
+      "phone": "9087144506",
+      "address": null,
+      "notes": null,
+      "createdAt": "2026-10-07T17:00:46.984Z",
+      "updatedAt": "2026-10-07T17:00:46.984Z"
+    }
+  ],
+  "loans": [
+    {
+      "id": "3ca15011-1a99-4686-8ea3-09d937c2673f",
+      "personId": "ea87c3d9-56f1-48b0-9d90-3df245536730",
+      "loanAmount": 5000000,
+      "loanDate": "2026-08-23",
+      "dailyInstallment": 50000,
+      "status": "ACTIVE",
+      "notes": "Stock purchase loan",
+      "createdAt": "2026-08-23T16:17:53.724Z",
+      "updatedAt": "2026-10-07T16:17:53.724Z"
+    },
+    {
+      "id": "f8616f9a-4046-47bf-8ba1-aec91677aa45",
+      "personId": "ea87c3d9-56f1-48b0-9d90-3df245536730",
+      "loanAmount": 2500000,
+      "loanDate": "2026-10-02",
+      "dailyInstallment": 50000,
+      "status": "ACTIVE",
+      "notes": "Festival season additional stock",
+      "createdAt": "2026-10-02T16:17:53.724Z",
+      "updatedAt": "2026-10-07T16:17:53.724Z"
+    },
+    {
+      "id": "e9deae61-2eff-4fba-9bee-a618ffce5dca",
+      "personId": "dcb115fa-2a0a-4779-9034-4698f5ee8082",
+      "loanAmount": 4000000,
+      "loanDate": "2026-09-07",
+      "dailyInstallment": 50000,
+      "status": "ACTIVE",
+      "notes": "Sewing machine investment",
+      "createdAt": "2026-09-07T16:17:53.724Z",
+      "updatedAt": "2026-10-07T16:17:53.724Z"
+    },
+    {
+      "id": "5701d128-255a-4af9-8efd-dfd5d1430448",
+      "personId": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "loanAmount": 2000000,
+      "loanDate": "2026-08-08",
+      "dailyInstallment": 100000,
+      "status": "COMPLETED",
+      "notes": "Initial tea stall renovation - fully repaid!",
+      "createdAt": "2026-08-08T16:17:53.724Z",
+      "updatedAt": "2026-10-07T16:17:53.724Z"
+    },
+    {
+      "id": "103c0a16-7814-436c-bd93-41a86fb23c83",
+      "personId": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "loanAmount": 6000000,
+      "loanDate": "2026-09-22",
+      "dailyInstallment": 100000,
+      "status": "ACTIVE",
+      "notes": "Second stall expansion loan",
+      "createdAt": "2026-09-22T16:17:53.724Z",
+      "updatedAt": "2026-10-07T16:17:53.724Z"
+    },
+    {
+      "id": "5faeeb93-a4a4-41dd-b1d4-ea6836f7f31e",
+      "personId": "10ec6bf3-ede1-4e06-a082-b99909ef6464",
+      "loanAmount": 1500000,
+      "loanDate": "2026-09-27",
+      "dailyInstallment": 30000,
+      "status": "ACTIVE",
+      "notes": "Store lighting and racks",
+      "createdAt": "2026-09-27T16:17:53.724Z",
+      "updatedAt": "2026-10-07T16:17:53.724Z"
+    },
+    {
+      "id": "a021b924-d51a-4ad0-a864-4cf3d73e2436",
+      "personId": "04f02e78-0771-4686-94fc-564aa30bf51a",
+      "loanAmount": 1000000,
+      "loanDate": "2026-10-07",
+      "dailyInstallment": 100000,
+      "status": "ACTIVE",
+      "notes": null,
+      "createdAt": "2026-10-07T17:01:10.889Z",
+      "updatedAt": "2026-10-07T17:01:10.889Z"
+    },
+    {
+      "id": "ed3deb22-dc37-46cc-9fa1-d14f37b2880c",
+      "personId": "04f02e78-0771-4686-94fc-564aa30bf51a",
+      "loanAmount": 50000,
+      "loanDate": "2026-10-07",
+      "dailyInstallment": 1000,
+      "status": "COMPLETED",
+      "notes": null,
+      "createdAt": "2026-10-07T17:01:42.840Z",
+      "updatedAt": "2026-10-07T17:02:15.124Z"
+    }
+  ],
+  "collections": [
+    {
+      "id": "022a7131-54e4-4a79-a5f6-f2943f82a813",
+      "loanId": "3ca15011-1a99-4686-8ea3-09d937c2673f",
+      "personId": "ea87c3d9-56f1-48b0-9d90-3df245536730",
+      "amount": 50000,
+      "collectedAt": "2026-10-07T04:00:00.000Z",
+      "notes": "Today morning collection",
+      "createdAt": "2026-10-07T16:17:53.735Z",
+      "updatedAt": "2026-10-07T16:17:53.735Z"
+    },
+    {
+      "id": "5b180609-c8ca-420c-82ba-d385eecdc9ee",
+      "loanId": "3ca15011-1a99-4686-8ea3-09d937c2673f",
+      "personId": "ea87c3d9-56f1-48b0-9d90-3df245536730",
+      "amount": 50000,
+      "collectedAt": "2026-10-06T16:17:53.724Z",
+      "notes": "Yesterday installment",
+      "createdAt": "2026-10-06T16:17:53.724Z",
+      "updatedAt": "2026-10-06T16:17:53.724Z"
+    },
+    {
+      "id": "9639f567-cf6e-4687-86ee-121e3da189f5",
+      "loanId": "3ca15011-1a99-4686-8ea3-09d937c2673f",
+      "personId": "ea87c3d9-56f1-48b0-9d90-3df245536730",
+      "amount": 2150000,
+      "collectedAt": "2026-09-27T16:17:53.724Z",
+      "notes": "Bulk repayment",
+      "createdAt": "2026-09-27T16:17:53.724Z",
+      "updatedAt": "2026-09-27T16:17:53.724Z"
+    },
+    {
+      "id": "762a2e38-5434-4c92-b866-c04214aaf61b",
+      "loanId": "e9deae61-2eff-4fba-9bee-a618ffce5dca",
+      "personId": "dcb115fa-2a0a-4779-9034-4698f5ee8082",
+      "amount": 70000,
+      "collectedAt": "2026-10-07T05:45:00.000Z",
+      "notes": "Today afternoon collection",
+      "createdAt": "2026-10-07T16:17:53.735Z",
+      "updatedAt": "2026-10-07T16:17:53.735Z"
+    },
+    {
+      "id": "1848fdce-1445-4435-84d0-05e11828e448",
+      "loanId": "e9deae61-2eff-4fba-9bee-a618ffce5dca",
+      "personId": "dcb115fa-2a0a-4779-9034-4698f5ee8082",
+      "amount": 1430000,
+      "collectedAt": "2026-09-30T16:17:53.724Z",
+      "notes": "Weekly collection",
+      "createdAt": "2026-09-30T16:17:53.724Z",
+      "updatedAt": "2026-09-30T16:17:53.724Z"
+    },
+    {
+      "id": "1e85c941-f7f4-45c7-a7e9-4ec2e60b7f21",
+      "loanId": "5701d128-255a-4af9-8efd-dfd5d1430448",
+      "personId": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "amount": 1000000,
+      "collectedAt": "2026-08-28T16:17:53.724Z",
+      "notes": "First half",
+      "createdAt": "2026-08-28T16:17:53.724Z",
+      "updatedAt": "2026-08-28T16:17:53.724Z"
+    },
+    {
+      "id": "1e488929-b22d-47d4-a9e1-eae84188d9ba",
+      "loanId": "5701d128-255a-4af9-8efd-dfd5d1430448",
+      "personId": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "amount": 1000000,
+      "collectedAt": "2026-09-12T16:17:53.724Z",
+      "notes": "Final installment - closed",
+      "createdAt": "2026-09-12T16:17:53.724Z",
+      "updatedAt": "2026-09-12T16:17:53.724Z"
+    },
+    {
+      "id": "70680341-afed-4437-a0f7-bcffc4a5cf12",
+      "loanId": "103c0a16-7814-436c-bd93-41a86fb23c83",
+      "personId": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "amount": 50000,
+      "collectedAt": "2026-10-07T07:15:00.000Z",
+      "notes": "Today installment",
+      "createdAt": "2026-10-07T16:17:53.736Z",
+      "updatedAt": "2026-10-07T16:17:53.736Z"
+    },
+    {
+      "id": "98bd03cf-15e2-4fd9-8234-eac84307e133",
+      "loanId": "103c0a16-7814-436c-bd93-41a86fb23c83",
+      "personId": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "amount": 1450000,
+      "collectedAt": "2026-10-03T16:17:53.724Z",
+      "notes": "Earlier installment",
+      "createdAt": "2026-10-03T16:17:53.724Z",
+      "updatedAt": "2026-10-03T16:17:53.724Z"
+    },
+    {
+      "id": "feadac08-beea-48c4-87b5-d83be6562c8e",
+      "loanId": "5faeeb93-a4a4-41dd-b1d4-ea6836f7f31e",
+      "personId": "10ec6bf3-ede1-4e06-a082-b99909ef6464",
+      "amount": 100000,
+      "collectedAt": "2026-10-06T16:17:53.724Z",
+      "notes": "Yesterday installment",
+      "createdAt": "2026-10-06T16:17:53.724Z",
+      "updatedAt": "2026-10-06T16:17:53.724Z"
+    },
+    {
+      "id": "c97dd5a6-0ab7-471a-88d5-7ffe541457da",
+      "loanId": "f8616f9a-4046-47bf-8ba1-aec91677aa45",
+      "personId": "ea87c3d9-56f1-48b0-9d90-3df245536730",
+      "amount": 100000,
+      "collectedAt": "2026-10-07T16:57:52.143Z",
+      "notes": null,
+      "createdAt": "2026-10-07T16:57:52.145Z",
+      "updatedAt": "2026-10-07T16:57:52.145Z"
+    },
+    {
+      "id": "24b41a46-1a54-4be8-8791-1277b76196c0",
+      "loanId": "ed3deb22-dc37-46cc-9fa1-d14f37b2880c",
+      "personId": "04f02e78-0771-4686-94fc-564aa30bf51a",
+      "amount": 50000,
+      "collectedAt": "2026-10-07T17:02:15.122Z",
+      "notes": null,
+      "createdAt": "2026-10-07T17:02:15.124Z",
+      "updatedAt": "2026-10-07T17:02:15.124Z"
+    },
+    {
+      "id": "1e52c976-1be1-4f20-ac27-6b17b09f4bae",
+      "loanId": "103c0a16-7814-436c-bd93-41a86fb23c83",
+      "personId": "e122c7d6-b73b-49d3-8111-3586eb396399",
+      "amount": 70300,
+      "collectedAt": "2026-10-07T17:07:10.996Z",
+      "notes": null,
+      "createdAt": "2026-10-07T17:07:10.999Z",
+      "updatedAt": "2026-10-07T17:07:10.999Z"
+    }
+  ]
+}
