@@ -8,6 +8,15 @@
       "notes": null,
       "createdAt": "2026-10-08T01:49:39.854Z",
       "updatedAt": "2026-10-08T01:49:39.854Z"
+    },
+    {
+      "id": "c470c514-1dcc-4273-8cbd-d5cbebeaf33e",
+      "fullName": "Muthurasu M",
+      "phone": "+918124996319",
+      "address": "Indiranagar, naranapuram road",
+      "notes": null,
+      "createdAt": "2026-10-08T14:49:34.103Z",
+      "updatedAt": "2026-10-08T14:49:34.103Z"
     }
   ],
   "loans": [
@@ -21,6 +30,17 @@
       "notes": null,
       "createdAt": "2026-10-08T01:50:01.552Z",
       "updatedAt": "2026-10-08T01:50:01.552Z"
+    },
+    {
+      "id": "37c9f267-031d-442f-be73-509b94a679b3",
+      "personId": "c470c514-1dcc-4273-8cbd-d5cbebeaf33e",
+      "loanAmount": 4000000,
+      "loanDate": "2026-10-08",
+      "dailyInstallment": 50000,
+      "status": "ACTIVE",
+      "notes": null,
+      "createdAt": "2026-10-08T14:50:17.553Z",
+      "updatedAt": "2026-10-08T14:50:17.553Z"
     }
   ],
   "collections": [
@@ -33,6 +53,16 @@
       "notes": null,
       "createdAt": "2026-10-08T01:50:27.349Z",
       "updatedAt": "2026-10-08T01:50:27.349Z"
+    },
+    {
+      "id": "2394043e-c909-4a95-a322-d821b9e77761",
+      "loanId": "37c9f267-031d-442f-be73-509b94a679b3",
+      "personId": "c470c514-1dcc-4273-8cbd-d5cbebeaf33e",
+      "amount": 50000,
+      "collectedAt": "2026-10-08T14:50:57.426Z",
+      "notes": null,
+      "createdAt": "2026-10-08T14:50:57.427Z",
+      "updatedAt": "2026-10-08T14:50:57.427Z"
     }
   ]
 }
