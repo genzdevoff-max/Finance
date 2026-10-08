@@ -1,8 +1,8 @@
-# Personal Loan Collection Tracker
+# Finance Tracker
 
-A simple, mobile-first single-user personal loan and daily installment collection management notebook. Built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Drizzle ORM**, and **Supabase PostgreSQL**.
+A simple, mobile-first personal finance, credit, and collection management application. Built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Drizzle ORM**, and **TiDB Cloud MySQL**.
 
-Designed specifically for an individual lender who needs a digital notebook to track borrowers, multiple separate loans per person, daily installment repayments, and running balances without manual math or accounting complexity.
+Designed to track financial accounts, multiple separate credit/loan records per person, installment repayments, and running balances without manual math or accounting complexity.
 
 ---
 

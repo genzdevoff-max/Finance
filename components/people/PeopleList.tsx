@@ -54,7 +54,7 @@ export function PeopleList({ initialPeople }: PeopleListProps) {
         <EmptyState
           icon={Users}
           title="No people yet"
-          description="Add your first borrower to get started tracking loans and collections."
+          description="Add your first person to get started tracking finances and collections."
           actionHref="/people/new"
           actionText="Add Person"
         />
@@ -62,7 +62,7 @@ export function PeopleList({ initialPeople }: PeopleListProps) {
         <EmptyState
           icon={Search}
           title="No matching people"
-          description={`No borrower found matching "${search}".`}
+          description={`No person found matching "${search}".`}
         />
       ) : (
         <div className="space-y-2.5">

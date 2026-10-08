@@ -18,7 +18,7 @@ export function PersonLoansList({ personId, loans }: PersonLoansListProps) {
       <EmptyState
         icon={FileText}
         title="This person has no loans"
-        description="Create the first loan for this borrower to start tracking collections."
+        description="Create the first finance/loan record for this person to start tracking."
         actionHref={`/loans/new?personId=${personId}`}
         actionText="Add Loan"
       />

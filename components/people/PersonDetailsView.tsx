@@ -39,7 +39,7 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
     setIsDeleting(false);
 
     if (!res.success) {
-      setErrorMsg(res.error || 'Failed to delete borrower');
+      setErrorMsg(res.error || 'Failed to delete person');
       return;
     }
 
@@ -87,14 +87,14 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
           <div className="flex items-center gap-1 shrink-0">
             <Link
               href={`/people/${person.id}/edit`}
-              aria-label="Edit borrower"
+              aria-label="Edit person"
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
             >
               <Edit2 className="h-4 w-4" />
             </Link>
             <button
               type="button"
-              aria-label="Delete borrower"
+              aria-label="Delete person"
               onClick={() => setIsDeleteModalOpen(true)}
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors"
             >
@@ -185,14 +185,14 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
         description={
           <div className="space-y-2">
             <p>
-              Are you sure you want to delete this borrower?
+              Are you sure you want to delete this person?
             </p>
             <p className="font-medium text-rose-700 text-xs">
               This will permanently remove all {person.loans.length} loans and related collection records.
             </p>
           </div>
         }
-        confirmText="Delete Borrower"
+        confirmText="Delete Person"
         cancelText="Cancel"
         isLoading={isDeleting}
       />

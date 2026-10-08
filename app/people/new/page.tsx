@@ -5,7 +5,7 @@ export default function NewPersonPage() {
   return (
     <div>
       <Header
-        title="Add Borrower"
+        title="Add Person"
         subtitle="Register a new person"
         backHref="/people"
       />

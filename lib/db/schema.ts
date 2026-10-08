@@ -1,28 +1,27 @@
-import { relations, sql } from 'drizzle-orm';
+import { relations } from 'drizzle-orm';
 import {
   bigint,
   index,
-  pgTable,
+  mysqlTable,
   text,
   timestamp,
-  uuid,
-  date,
-} from 'drizzle-orm/pg-core';
+  varchar,
+} from 'drizzle-orm/mysql-core';
 
 /**
  * PEOPLE TABLE
- * Stores borrowers information.
+ * Stores people / clients / accounts in the Finance Tracker.
  */
-export const people = pgTable(
+export const people = mysqlTable(
   'people',
   {
-    id: uuid('id').defaultRandom().primaryKey(),
-    fullName: text('full_name').notNull(),
-    phone: text('phone'),
+    id: varchar('id', { length: 36 }).primaryKey(),
+    fullName: varchar('full_name', { length: 255 }).notNull(),
+    phone: varchar('phone', { length: 50 }),
     address: text('address'),
     notes: text('notes'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull(),
   },
   (table) => [
     index('people_full_name_idx').on(table.fullName),
@@ -31,26 +30,26 @@ export const people = pgTable(
 );
 
 /**
- * LOANS TABLE
- * Each borrower can have multiple separate loans. Never merged.
- * Loan amounts are stored as integer paise (e.g. ₹50,000 = 5,000,000 paise).
+ * LOANS / FINANCE RECORDS TABLE
+ * Each person can have multiple finance / loan records.
+ * Amounts are stored as integer paise (e.g. ₹50,000 = 5,000,000 paise).
  */
-export const loans = pgTable(
+export const loans = mysqlTable(
   'loans',
   {
-    id: uuid('id').defaultRandom().primaryKey(),
-    personId: uuid('person_id')
+    id: varchar('id', { length: 36 }).primaryKey(),
+    personId: varchar('person_id', { length: 36 })
       .notNull()
       .references(() => people.id, { onDelete: 'cascade' }),
     loanAmount: bigint('loan_amount', { mode: 'number' }).notNull(),
-    loanDate: date('loan_date').notNull(),
+    loanDate: varchar('loan_date', { length: 10 }).notNull(), // YYYY-MM-DD
     dailyInstallment: bigint('daily_installment', { mode: 'number' }),
-    status: text('status', { enum: ['ACTIVE', 'COMPLETED'] })
+    status: varchar('status', { length: 20 })
       .notNull()
-      .default('ACTIVE'),
+      .default('ACTIVE'), // 'ACTIVE' | 'COMPLETED'
     notes: text('notes'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull(),
   },
   (table) => [
     index('loans_person_id_idx').on(table.personId),
@@ -60,25 +59,25 @@ export const loans = pgTable(
 );
 
 /**
- * COLLECTIONS TABLE
- * The single source of truth for all loan repayments/installments.
+ * COLLECTIONS / REPAYMENTS TABLE
+ * Single source of truth for all loan repayments / collections.
  * Amounts are stored as integer paise.
  */
-export const collections = pgTable(
+export const collections = mysqlTable(
   'collections',
   {
-    id: uuid('id').defaultRandom().primaryKey(),
-    loanId: uuid('loan_id')
+    id: varchar('id', { length: 36 }).primaryKey(),
+    loanId: varchar('loan_id', { length: 36 })
       .notNull()
       .references(() => loans.id, { onDelete: 'cascade' }),
-    personId: uuid('person_id')
+    personId: varchar('person_id', { length: 36 })
       .notNull()
       .references(() => people.id, { onDelete: 'cascade' }),
     amount: bigint('amount', { mode: 'number' }).notNull(),
-    collectedAt: timestamp('collected_at', { withTimezone: true }).defaultNow().notNull(),
+    collectedAt: timestamp('collected_at').defaultNow().notNull(),
     notes: text('notes'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull(),
   },
   (table) => [
     index('collections_loan_id_idx').on(table.loanId),

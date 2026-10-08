@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   return (
     <div>
       <Header
-        title="Personal Loan Tracker"
+        title="Finance Tracker"
         subtitle={todayFormatted}
       />
 

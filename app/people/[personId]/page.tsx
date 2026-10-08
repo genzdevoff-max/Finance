@@ -23,7 +23,7 @@ export default async function PersonDetailPage({ params }: PersonDetailPageProps
     <div>
       <Header
         title={person.fullName}
-        subtitle="Borrower Details"
+        subtitle="Person Details"
         backHref="/people"
       />
 

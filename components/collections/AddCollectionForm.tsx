@@ -114,7 +114,7 @@ export function AddCollectionForm({
     setErrorMsg(null);
 
     if (!selectedPersonId) {
-      setErrorMsg('Please select a borrower.');
+      setErrorMsg('Please select a person.');
       return;
     }
     if (!selectedLoanId) {
@@ -241,7 +241,7 @@ export function AddCollectionForm({
         {/* STEP 1: Select Person */}
         <div className="space-y-1.5">
           <label htmlFor="personSelect" className="block text-sm font-bold text-slate-800">
-            1. Select Borrower *
+            1. Select Person *
           </label>
           <select
             id="personSelect"
@@ -249,7 +249,7 @@ export function AddCollectionForm({
             onChange={(e) => setSelectedPersonId(e.target.value)}
             className="flex h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-base font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           >
-            <option value="">Choose borrower...</option>
+            <option value="">Choose person...</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.fullName} ({p.activeLoans.length} active{' '}

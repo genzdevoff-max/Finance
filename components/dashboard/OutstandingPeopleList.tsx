@@ -20,7 +20,7 @@ export function OutstandingPeopleList({ people }: OutstandingPeopleListProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <Users className="h-4 w-4 text-slate-700 stroke-[2.5]" />
-          Borrowers with Outstanding Balance
+          People with Outstanding Balance
         </h2>
         <Link
           href="/people"
@@ -34,9 +34,9 @@ export function OutstandingPeopleList({ people }: OutstandingPeopleListProps) {
         <EmptyState
           icon={Users}
           title="No outstanding balances"
-          description="All loans are either paid off or no borrowers exist yet."
+          description="All balances are settled or no records exist yet."
           actionHref="/people/new"
-          actionText="Add Borrower"
+          actionText="Add Person"
         />
       ) : (
         <div className="space-y-2">

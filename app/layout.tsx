@@ -4,13 +4,13 @@ import { BottomNav } from '@/components/shared/BottomNav';
 import { ServiceWorkerRegister } from '@/components/shared/ServiceWorkerRegister';
 
 export const metadata: Metadata = {
-  title: 'Loan Tracker - Personal Loan Management',
-  description: 'Simple mobile-first personal loan collection management notebook',
+  title: 'Finance Tracker',
+  description: 'Mobile-first Finance Tracker application',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'LoanTracker',
+    title: 'FinanceTracker',
   },
   icons: {
     icon: '/icons/icon-192.png',

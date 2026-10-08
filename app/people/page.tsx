@@ -16,7 +16,7 @@ export default async function PeoplePage() {
   return (
     <div>
       <Header
-        title="Borrowers"
+        title="People"
         subtitle={`${peopleList.length} ${peopleList.length === 1 ? 'person' : 'people'} registered`}
       />
 

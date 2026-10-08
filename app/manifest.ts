@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Loan Collection Tracker',
-    short_name: 'LoanTracker',
-    description: 'Simple mobile-first personal loan collection management notebook',
+    name: 'Finance Tracker',
+    short_name: 'FinanceTracker',
+    description: 'Mobile-first Finance Tracker application',
     start_url: '/',
     display: 'standalone',
     orientation: 'portrait',

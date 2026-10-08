@@ -79,14 +79,14 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
         {/* Person Selector */}
         <div className="space-y-1.5">
           <label htmlFor="personId" className="block text-sm font-semibold text-slate-700">
-            Borrower *
+            Person / Client *
           </label>
           <select
             id="personId"
             className="flex h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-base text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             {...register('personId')}
           >
-            <option value="">Select Borrower...</option>
+            <option value="">Select Person...</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.fullName}

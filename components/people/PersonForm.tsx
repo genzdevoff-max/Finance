@@ -136,7 +136,7 @@ export function PersonForm({ personId, initialData }: PersonFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="w-2/3" isLoading={isSubmitting}>
-            {personId ? 'Save Changes' : 'Save Borrower'}
+            {personId ? 'Save Changes' : 'Save Person'}
           </Button>
         </div>
       </form>

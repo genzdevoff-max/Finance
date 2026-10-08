@@ -15,7 +15,16 @@ export async function createPersonAction(data: {
     const newPerson = await createPerson(validated);
     revalidatePath('/people');
     revalidatePath('/dashboard');
-    return { success: true, person: newPerson };
+    return {
+      success: true,
+      person: {
+        id: newPerson.id,
+        fullName: newPerson.fullName,
+        phone: newPerson.phone,
+        address: newPerson.address,
+        notes: newPerson.notes,
+      },
+    };
   } catch (err: unknown) {
     console.error('Error creating person:', err);
     const message = err instanceof Error ? err.message : 'Unable to add person. Please try again.';
@@ -38,7 +47,16 @@ export async function updatePersonAction(
     revalidatePath('/people');
     revalidatePath(`/people/${id}`);
     revalidatePath('/dashboard');
-    return { success: true, person: updated };
+    return {
+      success: true,
+      person: {
+        id: updated.id,
+        fullName: updated.fullName,
+        phone: updated.phone,
+        address: updated.address,
+        notes: updated.notes,
+      },
+    };
   } catch (err: unknown) {
     console.error('Error updating person:', err);
     const message = err instanceof Error ? err.message : 'Unable to update person. Please try again.';

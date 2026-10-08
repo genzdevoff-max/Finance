@@ -75,7 +75,7 @@ export function PaymentHistoryList({
         <EmptyState
           icon={IndianRupee}
           title="No payments yet"
-          description="When the borrower pays an installment, record it here."
+          description="When a payment or installment is received, record it here."
           actionHref={isLoanActive ? `/collections/new?personId=${personId}&loanId=${loanId}` : undefined}
           actionText={isLoanActive ? 'Add First Collection' : undefined}
         />

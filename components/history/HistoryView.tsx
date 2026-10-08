@@ -203,7 +203,7 @@ export function HistoryView({
             onChange={(e) => handlePersonChange(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           >
-            <option value="all">All Borrowers ({peopleList.length})</option>
+            <option value="all">All People ({peopleList.length})</option>
             {peopleList.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.fullName}
