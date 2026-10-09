@@ -19,6 +19,12 @@ export function isDbConfigured(): boolean {
   return !!url && url.trim().length > 0 && !url.includes('<PASSWORD>');
 }
 
+export function assertDbConfigured(): void {
+  if (!isDbConfigured()) {
+    throw new Error('DATABASE_URL is not configured. Set the TiDB/MySQL connection string in .env.local.');
+  }
+}
+
 export function getDb(): DrizzleDb {
   const connectionString = process.env.DATABASE_URL;
 

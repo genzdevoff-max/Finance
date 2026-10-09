@@ -1,6 +1,6 @@
 import { getLoansByPersonId, type LoanWithFinancials } from './loans.service';
-import { readLocalDb, writeLocalDb, type Person } from '@/lib/storage/local-store';
-import { db, people, loans, collections, isDbConfigured } from '@/lib/db';
+import type { Person } from '@/lib/db/schema';
+import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
 import { eq, or, like, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -21,6 +21,7 @@ export interface PersonDetail extends PersonWithFinancials {
  * Gets all people with computed financial metrics and optional search filtering.
  */
 export async function getPeopleList(searchQuery?: string): Promise<PersonWithFinancials[]> {
+  assertDbConfigured();
   if (isDbConfigured()) {
     try {
       let query = db.select().from(people);
@@ -88,67 +89,19 @@ export async function getPeopleList(searchQuery?: string): Promise<PersonWithFin
 
       return results;
     } catch (err) {
-      console.warn('Database query failed in getPeopleList, using fallback storage:', err);
+      console.error('Database query failed in getPeopleList:', err);
+      throw err;
     }
   }
 
-  // Fallback to local store
-  const local = readLocalDb();
-  let peopleList = [...local.people];
-
-  if (searchQuery && searchQuery.trim().length > 0) {
-    const term = searchQuery.toLowerCase().trim();
-    peopleList = peopleList.filter(
-      (p) =>
-        p.fullName.toLowerCase().includes(term) ||
-        (p.phone && p.phone.toLowerCase().includes(term))
-    );
-  }
-
-  peopleList.sort((a, b) => a.fullName.localeCompare(b.fullName));
-
-  const results: PersonWithFinancials[] = [];
-
-  for (const person of peopleList) {
-    const pLoans = local.loans.filter((l) => l.personId === person.id);
-    let totalBorrowed = 0;
-    let activeLoansCount = 0;
-    let completedLoansCount = 0;
-
-    for (const l of pLoans) {
-      totalBorrowed += l.loanAmount;
-      if (l.status === 'ACTIVE') activeLoansCount++;
-      else completedLoansCount++;
-    }
-
-    const pCollections = local.collections.filter((c) => c.personId === person.id);
-    const totalCollected = pCollections.reduce((sum, c) => sum + c.amount, 0);
-    const totalOutstanding = Math.max(0, totalBorrowed - totalCollected);
-
-    results.push({
-      id: person.id,
-      fullName: person.fullName,
-      phone: person.phone,
-      address: person.address,
-      notes: person.notes,
-      createdAt: new Date(person.createdAt),
-      updatedAt: new Date(person.updatedAt),
-      totalBorrowed,
-      totalCollected,
-      totalOutstanding,
-      activeLoansCount,
-      completedLoansCount,
-      totalLoansCount: pLoans.length,
-    });
-  }
-
-  return results;
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
  * Gets a single person by ID with full financial metrics and loans list.
  */
 export async function getPersonById(id: string): Promise<PersonDetail | null> {
+  assertDbConfigured();
   if (isDbConfigured()) {
     try {
       const [personRecord] = await db
@@ -193,48 +146,14 @@ export async function getPersonById(id: string): Promise<PersonDetail | null> {
           loans: personLoans,
         };
       }
+      return null;
     } catch (err) {
-      console.warn('Database query failed in getPersonById, using fallback storage:', err);
+      console.error('Database query failed in getPersonById:', err);
+      throw err;
     }
   }
 
-  // Fallback to local store
-  const local = readLocalDb();
-  const person = local.people.find((p) => p.id === id);
-  if (!person) return null;
-
-  const personLoans = await getLoansByPersonId(id);
-
-  let totalBorrowed = 0;
-  let totalCollected = 0;
-  let activeLoansCount = 0;
-  let completedLoansCount = 0;
-
-  for (const l of personLoans) {
-    totalBorrowed += l.loanAmount;
-    totalCollected += l.totalCollected;
-    if (l.status === 'ACTIVE') activeLoansCount++;
-    else completedLoansCount++;
-  }
-
-  const totalOutstanding = Math.max(0, totalBorrowed - totalCollected);
-
-  return {
-    id: person.id,
-    fullName: person.fullName,
-    phone: person.phone,
-    address: person.address,
-    notes: person.notes,
-    createdAt: new Date(person.createdAt),
-    updatedAt: new Date(person.updatedAt),
-    totalBorrowed,
-    totalCollected,
-    totalOutstanding,
-    activeLoansCount,
-    completedLoansCount,
-    totalLoansCount: personLoans.length,
-    loans: personLoans,
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
@@ -246,6 +165,7 @@ export async function createPerson(data: {
   address?: string | null;
   notes?: string | null;
 }) {
+  assertDbConfigured();
   const newId = randomUUID();
   const now = new Date();
   const trimmedName = data.fullName.trim();
@@ -273,31 +193,12 @@ export async function createPerson(data: {
         updatedAt: now,
       };
     } catch (err) {
-      console.warn('Database insert failed in createPerson, falling back to local storage:', err);
+      console.error('Database insert failed in createPerson:', err);
+      throw err;
     }
   }
 
-  // Fallback to local store
-  const local = readLocalDb();
-  const nowIso = now.toISOString();
-  const newPerson = {
-    id: newId,
-    fullName: trimmedName,
-    phone,
-    address,
-    notes,
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-
-  local.people.push(newPerson);
-  writeLocalDb(local);
-
-  return {
-    ...newPerson,
-    createdAt: now,
-    updatedAt: now,
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
@@ -312,6 +213,7 @@ export async function updatePerson(
     notes?: string | null;
   }
 ) {
+  assertDbConfigured();
   const now = new Date();
   const trimmedName = data.fullName.trim();
   const phone = data.phone?.trim() || null;
@@ -320,6 +222,9 @@ export async function updatePerson(
 
   if (isDbConfigured()) {
     try {
+      const [existingPerson] = await db.select().from(people).where(eq(people.id, id));
+      if (!existingPerson) throw new Error('Person not found');
+
       await db
         .update(people)
         .set({
@@ -337,54 +242,38 @@ export async function updatePerson(
         phone,
         address,
         notes,
-        createdAt: now,
+        createdAt: new Date(existingPerson.createdAt),
         updatedAt: now,
       };
     } catch (err) {
-      console.warn('Database update failed in updatePerson, falling back to local storage:', err);
+      console.error('Database update failed in updatePerson:', err);
+      throw err;
     }
   }
 
-  // Fallback to local store
-  const local = readLocalDb();
-  const person = local.people.find((p) => p.id === id);
-  if (!person) throw new Error('Person not found');
-
-  person.fullName = trimmedName;
-  person.phone = phone;
-  person.address = address;
-  person.notes = notes;
-  person.updatedAt = now.toISOString();
-
-  writeLocalDb(local);
-
-  return {
-    ...person,
-    createdAt: new Date(person.createdAt),
-    updatedAt: now,
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
  * Deletes a person and cascades all related loans and collections.
  */
 export async function deletePerson(id: string) {
+  assertDbConfigured();
   if (isDbConfigured()) {
     try {
+      const [existingPerson] = await db.select({ id: people.id }).from(people).where(eq(people.id, id));
+      if (!existingPerson) throw new Error('Person not found');
+
       // In MySQL, delete collections and loans first if foreign keys are not cascading automatically
       await db.delete(collections).where(eq(collections.personId, id));
       await db.delete(loans).where(eq(loans.personId, id));
       await db.delete(people).where(eq(people.id, id));
       return true;
     } catch (err) {
-      console.warn('Database delete failed in deletePerson, falling back to local storage:', err);
+      console.error('Database delete failed in deletePerson:', err);
+      throw err;
     }
   }
 
-  const local = readLocalDb();
-  local.people = local.people.filter((p) => p.id !== id);
-  local.loans = local.loans.filter((l) => l.personId !== id);
-  local.collections = local.collections.filter((c) => c.personId !== id);
-  writeLocalDb(local);
-  return true;
+  throw new Error('DATABASE_URL is not configured.');
 }

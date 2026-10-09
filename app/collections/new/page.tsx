@@ -1,6 +1,7 @@
 import { AddCollectionForm, type PersonWithLoansData } from '@/components/collections/AddCollectionForm';
 import { Header } from '@/components/shared/Header';
-import { readLocalDb } from '@/lib/storage/local-store';
+import { getPeopleList } from '@/lib/services/people.service';
+import { getLoansByPersonId } from '@/lib/services/loans.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,40 +15,33 @@ interface NewCollectionPageProps {
 export default async function NewCollectionPage({ searchParams }: NewCollectionPageProps) {
   const { personId, loanId } = await searchParams;
 
-  const peopleMap = new Map<string, PersonWithLoansData>();
-  const local = readLocalDb();
-  const activeLoans = local.loans.filter((l) => l.status === 'ACTIVE');
+  const registeredPeople = await getPeopleList();
+  const peopleWithLoans = (
+    await Promise.all(
+      registeredPeople.map(async (person): Promise<PersonWithLoansData | null> => {
+        const loans = await getLoansByPersonId(person.id);
+        const activeLoans = loans
+          .filter((loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0)
+          .map((loan) => ({
+            id: loan.id,
+            loanAmount: loan.loanAmount,
+            loanDate: loan.loanDate,
+            dailyInstallment: loan.dailyInstallment,
+            installmentFrequency: loan.installmentFrequency,
+            remainingAmount: loan.remainingAmount,
+          }));
 
-  for (const loanItem of activeLoans) {
-    const person = local.people.find((p) => p.id === loanItem.personId);
-    if (!person) continue;
+        if (activeLoans.length === 0) return null;
 
-    const totalCollected = local.collections
-      .filter((c) => c.loanId === loanItem.id)
-      .reduce((sum, c) => sum + c.amount, 0);
-
-    const remainingAmount = Math.max(0, loanItem.loanAmount - totalCollected);
-    if (remainingAmount <= 0) continue;
-
-    if (!peopleMap.has(person.id)) {
-      peopleMap.set(person.id, {
-        id: person.id,
-        fullName: person.fullName,
-        phone: person.phone,
-        activeLoans: [],
-      });
-    }
-
-    peopleMap.get(person.id)!.activeLoans.push({
-      id: loanItem.id,
-      loanAmount: loanItem.loanAmount,
-      loanDate: loanItem.loanDate,
-      dailyInstallment: loanItem.dailyInstallment,
-      remainingAmount,
-    });
-  }
-
-  const peopleWithLoans = Array.from(peopleMap.values());
+        return {
+          id: person.id,
+          fullName: person.fullName,
+          phone: person.phone,
+          activeLoans,
+        };
+      })
+    )
+  ).filter((person): person is PersonWithLoansData => person !== null);
 
   return (
     <div>

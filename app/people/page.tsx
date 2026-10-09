@@ -5,13 +5,7 @@ import { Header } from '@/components/shared/Header';
 export const dynamic = 'force-dynamic';
 
 export default async function PeoplePage() {
-  let peopleList: PersonWithFinancials[] = [];
-
-  try {
-    peopleList = await getPeopleList();
-  } catch (err) {
-    console.error('Error fetching people list:', err);
-  }
+  const peopleList: PersonWithFinancials[] = await getPeopleList();
 
   return (
     <div>

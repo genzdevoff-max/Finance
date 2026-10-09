@@ -19,6 +19,7 @@ import {
   Trash2,
   Calendar,
   IndianRupee,
+  Download,
 } from 'lucide-react';
 import type { HistoryFilterRange } from '@/lib/services/collections.service';
 
@@ -95,6 +96,38 @@ export function HistoryView({
     e.preventDefault();
     applyFilters('custom', selectedPerson, customStart, customEnd);
   };
+
+  const exportParams = new URLSearchParams();
+  if (selectedPerson !== 'all') exportParams.set('personId', selectedPerson);
+  if (selectedRange === 'custom') {
+    if (customStart) exportParams.set('startDate', customStart);
+    if (customEnd) exportParams.set('endDate', customEnd);
+  } else if (selectedRange !== 'all') {
+    const range = selectedRange;
+    const today = new Date();
+    const date = (value: Date) =>
+      `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+    let start: Date | undefined;
+    let end: Date | undefined;
+    if (range === 'today') start = end = today;
+    if (range === 'yesterday') {
+      start = end = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    }
+    if (range === 'week') {
+      start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7));
+      end = today;
+    }
+    if (range === 'month') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = today;
+    }
+    if (start) exportParams.set('startDate', date(start));
+    if (end) exportParams.set('endDate', date(end));
+  }
+  const exportHref = `/api/history/export${exportParams.size ? `?${exportParams.toString()}` : ''}`;
+  const customRangeInvalid =
+    selectedRange === 'custom' &&
+    (!customStart || !customEnd || customStart > customEnd);
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -211,6 +244,22 @@ export function HistoryView({
             ))}
           </select>
         </div>
+        <a
+          href={customRangeInvalid ? undefined : exportHref}
+          aria-disabled={customRangeInvalid}
+          tabIndex={customRangeInvalid ? -1 : undefined}
+          className={`flex h-10 w-full items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors ${
+            customRangeInvalid
+              ? 'pointer-events-none border-slate-200 bg-slate-100 text-slate-400'
+              : 'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800'
+          }`}
+        >
+          <Download className="h-4 w-4" />
+          Download Excel (.xlsx)
+        </a>
+        <p className="text-[11px] text-slate-500">
+          Exports the selected customer and date filters. All Time + All People downloads all history.
+        </p>
       </Card>
 
       {errorMsg && (

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { installmentFrequencies } from '@/lib/constants/installment';
 
 export const loanSchema = z.object({
   personId: z.string().uuid({ message: 'Valid borrower selection is required' }),
@@ -10,11 +11,8 @@ export const loanSchema = z.object({
     .string()
     .min(1, { message: 'Loan date is required' })
     .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Loan date must be YYYY-MM-DD' }),
-  dailyInstallment: z
-    .number({ invalid_type_error: 'Expected daily installment must be a number' })
-    .positive({ message: 'Daily installment must be greater than ₹0' })
-    .optional()
-    .nullable(),
+  dailyInstallment: z.number().positive().optional().nullable(),
+  installmentFrequency: z.enum(installmentFrequencies).default('DAILY'),
   notes: z
     .string()
     .trim()

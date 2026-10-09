@@ -15,6 +15,7 @@ Designed to track financial accounts, multiple separate credit/loan records per 
   - Live preview of remaining balance before recording payment.
   - Pre-selected loan & borrower shortcuts when navigating from borrower or loan detail pages.
 - **Multiple Loans Per Person**: Never merges separate loans. Each loan maintains its own principal, installment history, and status.
+- **Flexible Collection Schedule**: Choose daily, weekly, or monthly installment frequency per loan and adjust it later from loan details.
 - **Strict Financial Integrity**:
   - Monetary values stored and computed as integer **Paise** (1 Rupee = 100 paise) to eliminate JavaScript floating-point rounding errors.
   - All calculations are derived strictly from valid collection records.
@@ -23,7 +24,7 @@ Designed to track financial accounts, multiple separate credit/loan records per 
   - Deleting or editing a payment automatically recalibrates loan balances and statuses.
 - **Instant Dashboard Insights**:
   - Total Outstanding across all active loans.
-  - Collected Today with transaction count.
+  - Daily, weekly (Monday-to-date), and monthly-to-date collection totals and records.
   - Active Borrowers and Active Loans counts.
   - Today's collection activity stream with timestamps.
   - Ranked list of borrowers with pending balances.
@@ -31,6 +32,10 @@ Designed to track financial accounts, multiple separate credit/loan records per 
   - Filter payments by Today, Yesterday, This Week, This Month, All Time, or Custom Date Range.
   - Filter by individual borrower.
   - Edit or delete payment entries with automatic balance recalculation.
+- **Excel Export**: Download a person’s loan summary and full collection history as an `.xlsx` workbook.
+- **History Reports**: Download all history, an individual customer’s history, or a date-filtered collection report as a three-sheet Excel workbook.
+
+The history workbook reports actual saved collection records as successful payments and omits internal loan and collection IDs. Payment mode is shown as “Not recorded” because the current collection schema does not store payment mode. No installment due dates are configured, so next due dates show “Not scheduled” and overdue installment statuses are not inferred. The Installment Schedule sheet reports loan-level collected and outstanding balances instead of inventing due rows.
 - **Indian Rupee Formatting**:
   - Formatted using `Intl.NumberFormat('en-IN')` (e.g. `₹500`, `₹1,000`, `₹25,500`, `₹1,25,000`).
 
@@ -41,8 +46,8 @@ Designed to track financial accounts, multiple separate credit/loan records per 
 - **Framework**: [Next.js 15.5.x](https://nextjs.org/) (App Router, Server Actions, React Server Components)
 - **Runtime & Language**: Node.js 20 LTS, React 19, Strict TypeScript
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) with custom mobile UI components
-- **Database**: PostgreSQL on [Supabase](https://supabase.com/)
-- **ORM**: [Drizzle ORM](https://orm.drizzle.team/) with [Postgres.js](https://github.com/porsager/postgres)
+- **Database**: TiDB Cloud (MySQL-compatible)
+- **ORM**: [Drizzle ORM](https://orm.drizzle.team/) with `mysql2`
 - **Forms & Validation**: [React Hook Form](https://react-hook-form.com/) & [Zod](https://zod.dev/)
 - **Date Utilities**: [date-fns](https://date-fns.org/)
 - **Icons**: [Lucide React](https://lucide.dev/)
@@ -54,7 +59,7 @@ Designed to track financial accounts, multiple separate credit/loan records per 
 
 - **Node.js**: `v20.x` LTS (Specified in `.nvmrc`)
 - **Package Manager**: `npm`
-- **Database**: Supabase PostgreSQL database (or any PostgreSQL 14+ instance)
+- **Database**: TiDB Cloud or another MySQL-compatible database
 
 ---
 
@@ -63,40 +68,41 @@ Designed to track financial accounts, multiple separate credit/loan records per 
 Create a `.env.local` file in the root directory:
 
 ```env
-# Supabase PostgreSQL Connection String
-# For Supabase Transaction Pooler (recommended for Vercel Serverless):
-DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[YOUR_PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true
-
-# Or Direct Connection (for local migration & seeding):
-# DATABASE_URL=postgresql://postgres:[YOUR_PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+# TiDB Cloud MySQL connection string
+DATABASE_URL=mysql://<USERNAME>:<PASSWORD>@<HOST>:4000/lonetracker?ssl=true
 ```
 
 An example template is available in `.env.example`.
 
 ---
 
-## 🗄️ Database Setup (Supabase)
+## 🗄️ Database Setup (TiDB Cloud)
 
-### 1. Create a Supabase Project
-1. Log in to [Supabase](https://supabase.com/).
-2. Click **New Project** and name it `loan-tracker`.
-3. Set a strong database password (keep this saved).
-4. Once provisioned, navigate to **Project Settings &rarr; Database**.
-5. Copy the connection string under **Connection Pooling** (Mode: `Transaction`, port `6543`).
+Set `DATABASE_URL` in `.env.local` to your TiDB Cloud connection string. The Finance app
+uses the `people`, `loans`, and `collections` tables in the selected database.
 
 ### 2. Apply Database Schema
 
-You can push the schema directly to your Supabase database:
+For a new database, generate the tables from the Drizzle schema:
 
 ```bash
 npm run db:push
 ```
 
-Or apply the versioned migrations in `lib/db/migrations`:
+Or apply the versioned migrations:
 
 ```bash
 npm run db:migrate
 ```
+
+When upgrading an existing database to include per-loan daily, weekly, or monthly
+installment frequency, run once:
+
+```bash
+npm run db:migrate:frequency
+```
+
+Existing loans retain daily frequency as their default.
 
 ### 3. Seed Realistic Sample Data
 

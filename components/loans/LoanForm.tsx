@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { getTodayDateString } from '@/lib/utils/date';
 import { formatRupeesPlain } from '@/lib/utils/currency';
+import { installmentFrequencyLabel } from '@/lib/constants/installment';
 
 interface LoanFormProps {
   people: { id: string; fullName: string }[];
@@ -34,12 +35,15 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
       loanAmount: undefined,
       loanDate: getTodayDateString(),
       dailyInstallment: undefined,
+      installmentFrequency: 'DAILY',
       notes: '',
     },
   });
 
   const enteredAmount = watch('loanAmount');
   const enteredDaily = watch('dailyInstallment');
+  const installmentFrequency = watch('installmentFrequency');
+  const frequencyLabel = installmentFrequencyLabel(installmentFrequency);
 
   const onSubmit = async (data: LoanFormData) => {
     setErrorMsg(null);
@@ -51,6 +55,7 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
         loanAmount: Number(data.loanAmount),
         loanDate: data.loanDate,
         dailyInstallment: data.dailyInstallment ? Number(data.dailyInstallment) : null,
+        installmentFrequency: data.installmentFrequency,
         notes: data.notes,
       });
 
@@ -125,10 +130,29 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
           />
         </div>
 
-        {/* Daily Installment */}
+        {/* Collection Schedule */}
+        <div className="space-y-1.5">
+          <label htmlFor="installmentFrequency" className="block text-sm font-semibold text-slate-700">
+            Collection Frequency *
+          </label>
+          <select
+            id="installmentFrequency"
+            className="flex h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-base text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            {...register('installmentFrequency')}
+          >
+            <option value="DAILY">Daily</option>
+            <option value="WEEKLY">Weekly</option>
+            <option value="MONTHLY">Monthly</option>
+          </select>
+          {errors.installmentFrequency?.message && (
+            <p className="text-xs font-medium text-rose-600">{errors.installmentFrequency.message}</p>
+          )}
+        </div>
+
+        {/* Expected Installment */}
         <div>
           <Input
-            label="Expected Daily Installment (₹)"
+            label={`Expected ${frequencyLabel[0].toUpperCase()}${frequencyLabel.slice(1)} Installment (₹)`}
             type="number"
             inputMode="numeric"
             placeholder="e.g. 500"
@@ -138,8 +162,8 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
             error={errors.dailyInstallment?.message}
             hint={
               enteredDaily && !isNaN(enteredDaily) && enteredDaily > 0
-                ? `Expected daily collection: ${formatRupeesPlain(enteredDaily)}`
-                : 'Optional target amount to collect daily'
+                ? `Expected ${frequencyLabel} collection: ${formatRupeesPlain(enteredDaily)}`
+                : `Optional target amount to collect ${frequencyLabel}`
             }
           />
         </div>

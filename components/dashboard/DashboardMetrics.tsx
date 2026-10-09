@@ -74,6 +74,17 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
           </p>
         </Card>
 
+        <Card className="border-sky-200/70 bg-sky-50/70 p-4 transition-all">
+          <div className="flex items-center justify-between text-sky-800">
+            <span className="text-xs font-bold uppercase tracking-wider">Collected This Week</span>
+            <TrendingUp className="h-4 w-4 text-sky-600" />
+          </div>
+          <div className="mt-1.5 text-2xl font-black text-sky-900">
+            {formatRupees(summary.collectedThisWeek)}
+          </div>
+          <p className="mt-1 text-[11px] text-sky-700 font-medium">Monday to today</p>
+        </Card>
+
         {/* Active People */}
         <Card className="p-4 transition-all">
           <div className="flex items-center justify-between text-slate-600">

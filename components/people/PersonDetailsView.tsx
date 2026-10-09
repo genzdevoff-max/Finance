@@ -18,6 +18,7 @@ import {
   MapPin,
   FileText,
   IndianRupee,
+  Download,
 } from 'lucide-react';
 import type { PersonDetail } from '@/lib/services/people.service';
 
@@ -158,6 +159,13 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
             </Button>
           )}
         </div>
+        <Link
+          href={`/api/people/${person.id}/export`}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          <Download className="h-4 w-4" />
+          Download Full Loan History (Excel)
+        </Link>
       </Card>
 
       {/* Loans Section */}

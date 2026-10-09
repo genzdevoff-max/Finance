@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getCollectionById } from '@/lib/services/collections.service';
-import { readLocalDb } from '@/lib/storage/local-store';
+import { getLoanById } from '@/lib/services/loans.service';
 import { EditCollectionForm } from '@/components/collections/EditCollectionForm';
 import { Header } from '@/components/shared/Header';
 
@@ -20,18 +20,12 @@ export default async function EditCollectionPage({ params }: EditCollectionPageP
     notFound();
   }
 
-  const local = readLocalDb();
-  const loanRecord = local.loans.find((l) => l.id === collection.loanId);
-
-  if (!loanRecord) {
+  const loan = await getLoanById(collection.loanId);
+  if (!loan) {
     notFound();
   }
 
-  const otherCollected = local.collections
-    .filter((c) => c.loanId === collection.loanId && c.id !== collectionId)
-    .reduce((sum, c) => sum + c.amount, 0);
-
-  const maxAllowedPaise = Math.max(0, loanRecord.loanAmount - otherCollected);
+  const maxAllowedPaise = loan.loanAmount - loan.totalCollected + collection.amount;
 
   return (
     <div>

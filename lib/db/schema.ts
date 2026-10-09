@@ -7,6 +7,7 @@ import {
   timestamp,
   varchar,
 } from 'drizzle-orm/mysql-core';
+import type { InstallmentFrequency } from '@/lib/constants/installment';
 
 /**
  * PEOPLE TABLE
@@ -44,6 +45,10 @@ export const loans = mysqlTable(
     loanAmount: bigint('loan_amount', { mode: 'number' }).notNull(),
     loanDate: varchar('loan_date', { length: 10 }).notNull(), // YYYY-MM-DD
     dailyInstallment: bigint('daily_installment', { mode: 'number' }),
+    installmentFrequency: varchar('installment_frequency', { length: 10 })
+      .$type<InstallmentFrequency>()
+      .notNull()
+      .default('DAILY'),
     status: varchar('status', { length: 20 })
       .notNull()
       .default('ACTIVE'), // 'ACTIVE' | 'COMPLETED'

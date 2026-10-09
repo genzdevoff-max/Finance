@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PlusCircle, User, Calendar, Clock } from 'lucide-react';
 import type { LoanWithFinancials } from '@/lib/services/loans.service';
+import { installmentFrequencyLabel } from '@/lib/constants/installment';
+import { LoanScheduleEditor } from './LoanScheduleEditor';
 
 interface LoanSummaryCardProps {
   loan: LoanWithFinancials;
@@ -76,10 +78,17 @@ export function LoanSummaryCard({ loan }: LoanSummaryCardProps) {
           {loan.dailyInstallment && (
             <div className="flex items-center gap-1.5 text-slate-600">
               <Clock className="h-4 w-4 text-emerald-600" />
-              <span>Target: {formatRupees(loan.dailyInstallment)}/day</span>
+              <span>Target: {formatRupees(loan.dailyInstallment)}/{installmentFrequencyLabel(loan.installmentFrequency)}</span>
             </div>
           )}
         </div>
+
+        <LoanScheduleEditor
+          loanId={loan.id}
+          frequency={loan.installmentFrequency}
+          installmentPaise={loan.dailyInstallment}
+          disabled={loan.status !== 'ACTIVE'}
+        />
 
         {loan.notes && (
           <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600 italic border border-slate-100">

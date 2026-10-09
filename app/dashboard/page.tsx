@@ -1,6 +1,6 @@
 import { getDashboardSummary } from '@/lib/services/dashboard.service';
 import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
-import { TodaysCollectionsList } from '@/components/dashboard/TodaysCollectionsList';
+import { CollectionsPeriodTabs } from '@/components/dashboard/CollectionsPeriodTabs';
 import { OutstandingPeopleList } from '@/components/dashboard/OutstandingPeopleList';
 import { Header } from '@/components/shared/Header';
 import { format } from 'date-fns';
@@ -38,10 +38,14 @@ export default async function DashboardPage() {
             {/* Main Financial Metrics */}
             <DashboardMetrics summary={summary} />
 
-            {/* Today's Collections */}
-            <TodaysCollectionsList
-              collections={summary.todayCollections.items}
-              totalToday={summary.todayCollections.totalCollectedToday}
+            <CollectionsPeriodTabs
+              today={{
+                totalCollected: summary.todayCollections.totalCollectedToday,
+                count: summary.todayCollections.count,
+                items: summary.todayCollections.items,
+              }}
+              week={summary.weekCollections}
+              month={summary.monthCollections}
             />
 
             {/* Outstanding People */}

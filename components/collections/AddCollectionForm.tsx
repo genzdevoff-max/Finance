@@ -12,6 +12,7 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { createCollectionAction } from '@/app/actions/collections.actions';
 import { CheckCircle2, AlertCircle, ArrowRight, IndianRupee, Users } from 'lucide-react';
+import { installmentFrequencyLabel } from '@/lib/constants/installment';
 
 export interface PersonWithLoansData {
   id: string;
@@ -22,6 +23,7 @@ export interface PersonWithLoansData {
     loanAmount: number; // in paise
     loanDate: string;
     dailyInstallment: number | null; // in paise
+    installmentFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY';
     remainingAmount: number; // in paise
   }[];
 }
@@ -94,8 +96,8 @@ export function AddCollectionForm({
   const isValidToCollect =
     currentPerson && currentLoan && !isAmountZeroOrNegative && !isAmountOver;
 
-  // Preset fill button handler (e.g. Expected daily installment)
-  const handleSetDailyAmount = () => {
+  // Fill the expected installment amount for the loan's configured frequency.
+  const handleSetInstallmentAmount = () => {
     if (currentLoan?.dailyInstallment) {
       const rs = currentLoan.dailyInstallment / 100;
       setAmountStr(String(rs));
@@ -289,7 +291,7 @@ export function AddCollectionForm({
               <span>CURRENT REMAINING BALANCE</span>
               {currentLoan.dailyInstallment && (
                 <span className="text-emerald-400 font-medium">
-                  Target: {formatRupees(currentLoan.dailyInstallment)}/day
+                  Target: {formatRupees(currentLoan.dailyInstallment)}/{installmentFrequencyLabel(currentLoan.installmentFrequency)}
                 </span>
               )}
             </div>
@@ -303,10 +305,10 @@ export function AddCollectionForm({
               {currentLoan.dailyInstallment && (
                 <button
                   type="button"
-                  onClick={handleSetDailyAmount}
+                  onClick={handleSetInstallmentAmount}
                   className="rounded-lg bg-slate-800 hover:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-emerald-400 transition-colors"
                 >
-                  Fill Daily ({formatRupees(currentLoan.dailyInstallment)})
+                  Fill {installmentFrequencyLabel(currentLoan.installmentFrequency)} ({formatRupees(currentLoan.dailyInstallment)})
                 </button>
               )}
               <button
@@ -325,7 +327,7 @@ export function AddCollectionForm({
           <div className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <label htmlFor="amountInput" className="block text-sm font-bold text-slate-800">
-                3. Amount Collected Today (₹) *
+                3. Collection Amount (₹) *
               </label>
               <Input
                 id="amountInput"

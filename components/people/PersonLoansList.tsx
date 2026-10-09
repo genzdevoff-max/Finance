@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { FileText, ChevronRight, IndianRupee } from 'lucide-react';
 import type { LoanWithFinancials } from '@/lib/services/loans.service';
+import { installmentFrequencyLabel } from '@/lib/constants/installment';
 
 interface PersonLoansListProps {
   personId: string;
@@ -84,7 +85,7 @@ export function PersonLoansList({ personId, loans }: PersonLoansListProps) {
                 </span>
                 {loan.dailyInstallment && (
                   <span className="font-semibold text-emerald-700 text-[11px]">
-                    {formatRupees(loan.dailyInstallment)}/day
+                    {formatRupees(loan.dailyInstallment)}/{installmentFrequencyLabel(loan.installmentFrequency)}
                   </span>
                 )}
               </div>

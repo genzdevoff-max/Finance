@@ -3,13 +3,11 @@ import {
   startOfDay,
   endOfDay,
   startOfWeek,
-  endOfWeek,
   startOfMonth,
-  endOfMonth,
   subDays,
 } from 'date-fns';
-import { readLocalDb, writeLocalDb, type Collection } from '@/lib/storage/local-store';
-import { db, people, loans, collections, isDbConfigured } from '@/lib/db';
+import type { Collection } from '@/lib/db/schema';
+import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
 import { eq, sql, gte, lte, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -29,6 +27,7 @@ export async function createCollection(data: {
   collectedAt?: Date | null;
   notes?: string | null;
 }) {
+  assertDbConfigured();
   if (data.amountPaise <= 0) {
     throw new Error('Collection amount must be greater than ₹0.');
   }
@@ -47,6 +46,10 @@ export async function createCollection(data: {
 
       if (!loanRecord) {
         throw new Error('Selected finance record not found.');
+      }
+
+      if (loanRecord.personId !== data.personId) {
+        throw new Error('Selected finance record does not belong to this person.');
       }
 
       if (loanRecord.status === 'COMPLETED') {
@@ -97,68 +100,19 @@ export async function createCollection(data: {
     } catch (err) {
       if (err instanceof Error && err.message.includes('Collection cannot')) throw err;
       if (err instanceof Error && err.message.includes('Cannot add collection')) throw err;
-      console.warn('Database insert failed in createCollection, falling back to local storage:', err);
+      console.error('Database insert failed in createCollection:', err);
+      throw err;
     }
   }
 
-  // Fallback to local store
-  const local = readLocalDb();
-  const loanRecord = local.loans.find((l) => l.id === data.loanId);
-
-  if (!loanRecord) {
-    throw new Error('Selected record not found.');
-  }
-
-  if (loanRecord.status === 'COMPLETED') {
-    throw new Error('Cannot add collection to an already completed record.');
-  }
-
-  const currentCollected = local.collections
-    .filter((c) => c.loanId === data.loanId)
-    .reduce((sum, c) => sum + c.amount, 0);
-
-  const remainingPaise = Math.max(0, loanRecord.loanAmount - currentCollected);
-
-  if (data.amountPaise > remainingPaise) {
-    throw new Error(
-      `Collection cannot be greater than the remaining balance of ${formatRupees(remainingPaise)}.`
-    );
-  }
-
-  const nowIso = collectedAt.toISOString();
-  const newCollection = {
-    id: newId,
-    loanId: data.loanId,
-    personId: data.personId,
-    amount: data.amountPaise,
-    collectedAt: nowIso,
-    notes: trimmedNotes,
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-  };
-
-  local.collections.push(newCollection);
-
-  const newRemaining = remainingPaise - data.amountPaise;
-  if (newRemaining <= 0) {
-    loanRecord.status = 'COMPLETED';
-    loanRecord.updatedAt = new Date().toISOString();
-  }
-
-  writeLocalDb(local);
-
-  return {
-    ...newCollection,
-    collectedAt,
-    createdAt: now,
-    updatedAt: now,
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
  * Gets a single collection by ID with related person and loan details.
  */
 export async function getCollectionById(id: string) {
+  assertDbConfigured();
   if (isDbConfigured()) {
     try {
       const [col] = await db
@@ -191,31 +145,14 @@ export async function getCollectionById(id: string) {
           loanDate: loan?.loanDate || '',
         };
       }
+      return null;
     } catch (err) {
-      console.warn('Database query failed in getCollectionById, falling back to local storage:', err);
+      console.error('Database query failed in getCollectionById:', err);
+      throw err;
     }
   }
 
-  const local = readLocalDb();
-  const col = local.collections.find((c) => c.id === id);
-  if (!col) return null;
-
-  const person = local.people.find((p) => p.id === col.personId);
-  const loan = local.loans.find((l) => l.id === col.loanId);
-
-  return {
-    id: col.id,
-    loanId: col.loanId,
-    personId: col.personId,
-    amount: col.amount,
-    collectedAt: new Date(col.collectedAt),
-    notes: col.notes,
-    createdAt: new Date(col.createdAt),
-    updatedAt: new Date(col.updatedAt),
-    personName: person?.fullName || 'Contact',
-    loanAmount: loan?.loanAmount || 0,
-    loanDate: loan?.loanDate || '',
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
@@ -229,6 +166,7 @@ export async function updateCollection(
     notes?: string | null;
   }
 ) {
+  assertDbConfigured();
   if (data.amountPaise <= 0) {
     throw new Error('Collection amount must be greater than ₹0.');
   }
@@ -294,53 +232,19 @@ export async function updateCollection(
       };
     } catch (err) {
       if (err instanceof Error && err.message.includes('Collection cannot')) throw err;
-      console.warn('Database update failed in updateCollection, falling back to local storage:', err);
+      console.error('Database update failed in updateCollection:', err);
+      throw err;
     }
   }
 
-  // Fallback to local store
-  const local = readLocalDb();
-  const col = local.collections.find((c) => c.id === id);
-  if (!col) throw new Error('Collection record not found.');
-
-  const loanRecord = local.loans.find((l) => l.id === col.loanId);
-  if (!loanRecord) throw new Error('Associated record not found.');
-
-  const otherCollected = local.collections
-    .filter((c) => c.loanId === col.loanId && c.id !== id)
-    .reduce((sum, c) => sum + c.amount, 0);
-
-  const maxAllowedPaise = Math.max(0, loanRecord.loanAmount - otherCollected);
-
-  if (data.amountPaise > maxAllowedPaise) {
-    throw new Error(
-      `Collection cannot be greater than the available balance of ${formatRupees(maxAllowedPaise)}.`
-    );
-  }
-
-  col.amount = data.amountPaise;
-  if (data.collectedAt) col.collectedAt = data.collectedAt.toISOString();
-  if (data.notes !== undefined) col.notes = data.notes?.trim() || null;
-  col.updatedAt = now.toISOString();
-
-  const totalNowCollected = otherCollected + data.amountPaise;
-  loanRecord.status = totalNowCollected >= loanRecord.loanAmount ? 'COMPLETED' : 'ACTIVE';
-  loanRecord.updatedAt = now.toISOString();
-
-  writeLocalDb(local);
-
-  return {
-    ...col,
-    collectedAt: new Date(col.collectedAt),
-    createdAt: new Date(col.createdAt),
-    updatedAt: now,
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
  * Deletes a collection and restores loan status if necessary.
  */
 export async function deleteCollection(id: string) {
+  assertDbConfigured();
   if (isDbConfigured()) {
     try {
       const [col] = await db
@@ -372,34 +276,21 @@ export async function deleteCollection(id: string) {
 
         return true;
       }
+      throw new Error('Collection not found.');
     } catch (err) {
-      console.warn('Database delete failed in deleteCollection, falling back to local storage:', err);
+      console.error('Database delete failed in deleteCollection:', err);
+      throw err;
     }
   }
 
-  const local = readLocalDb();
-  const col = local.collections.find((c) => c.id === id);
-  if (!col) throw new Error('Collection not found.');
-
-  const loanId = col.loanId;
-  local.collections = local.collections.filter((c) => c.id !== id);
-
-  const loanRecord = local.loans.find((l) => l.id === loanId);
-  if (loanRecord) {
-    const remainingCols = local.collections.filter((c) => c.loanId === loanId);
-    const totalCollectedAfter = remainingCols.reduce((sum, c) => sum + c.amount, 0);
-    loanRecord.status = totalCollectedAfter >= loanRecord.loanAmount ? 'COMPLETED' : 'ACTIVE';
-    loanRecord.updatedAt = new Date().toISOString();
-  }
-
-  writeLocalDb(local);
-  return true;
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
  * Fetches collections for today.
  */
 export async function getTodayCollections() {
+  assertDbConfigured();
   const now = new Date();
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
@@ -452,41 +343,12 @@ export async function getTodayCollections() {
         items,
       };
     } catch (err) {
-      console.warn('Database query failed in getTodayCollections, falling back to local storage:', err);
+      console.error('Database query failed in getTodayCollections:', err);
+      throw err;
     }
   }
 
-  const local = readLocalDb();
-  const todayItems = local.collections
-    .filter((c) => {
-      const d = new Date(c.collectedAt);
-      return d >= todayStart && d <= todayEnd;
-    })
-    .sort((a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime());
-
-  const totalCollectedToday = todayItems.reduce((sum, c) => sum + c.amount, 0);
-
-  return {
-    totalCollectedToday,
-    count: todayItems.length,
-    items: todayItems.map((c) => {
-      const person = local.people.find((p) => p.id === c.personId);
-      const loan = local.loans.find((l) => l.id === c.loanId);
-      return {
-        id: c.id,
-        loanId: c.loanId,
-        personId: c.personId,
-        amount: c.amount,
-        collectedAt: new Date(c.collectedAt),
-        notes: c.notes,
-        createdAt: new Date(c.createdAt),
-        updatedAt: new Date(c.updatedAt),
-        personName: person?.fullName || 'Contact',
-        loanAmount: loan?.loanAmount || 0,
-        loanDate: loan?.loanDate || '',
-      };
-    }),
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 export type HistoryFilterRange =
@@ -508,6 +370,7 @@ export interface HistoryQueryOptions {
  * Fetches collection history with date ranges and optional person filter.
  */
 export async function getCollectionsHistory(options: HistoryQueryOptions = {}) {
+  assertDbConfigured();
   const now = new Date();
   let fromDate: Date | null = null;
   let toDate: Date | null = null;
@@ -523,11 +386,11 @@ export async function getCollectionsHistory(options: HistoryQueryOptions = {}) {
       break;
     case 'week':
       fromDate = startOfWeek(now, { weekStartsOn: 1 });
-      toDate = endOfWeek(now, { weekStartsOn: 1 });
+      toDate = now;
       break;
     case 'month':
       fromDate = startOfMonth(now);
-      toDate = endOfMonth(now);
+      toDate = now;
       break;
     case 'custom':
       if (options.startDate) fromDate = startOfDay(new Date(options.startDate));
@@ -593,45 +456,10 @@ export async function getCollectionsHistory(options: HistoryQueryOptions = {}) {
         items,
       };
     } catch (err) {
-      console.warn('Database query failed in getCollectionsHistory, falling back to local storage:', err);
+      console.error('Database query failed in getCollectionsHistory:', err);
+      throw err;
     }
   }
 
-  // Fallback to local store
-  const local = readLocalDb();
-  const items = local.collections.filter((c) => {
-    const d = new Date(c.collectedAt);
-    if (fromDate && d < fromDate) return false;
-    if (toDate && d > toDate) return false;
-    if (options.personId && options.personId !== 'all' && c.personId !== options.personId) {
-      return false;
-    }
-    return true;
-  });
-
-  items.sort((a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime());
-
-  const totalCollected = items.reduce((sum, c) => sum + c.amount, 0);
-
-  return {
-    totalCollected,
-    count: items.length,
-    items: items.map((c) => {
-      const person = local.people.find((p) => p.id === c.personId);
-      const loan = local.loans.find((l) => l.id === c.loanId);
-      return {
-        id: c.id,
-        loanId: c.loanId,
-        personId: c.personId,
-        amount: c.amount,
-        collectedAt: new Date(c.collectedAt),
-        notes: c.notes,
-        createdAt: new Date(c.createdAt),
-        updatedAt: new Date(c.updatedAt),
-        personName: person?.fullName || 'Contact',
-        loanAmount: loan?.loanAmount || 0,
-        loanDate: loan?.loanDate || '',
-      };
-    }),
-  };
+  throw new Error('DATABASE_URL is not configured.');
 }

@@ -29,6 +29,7 @@ export async function ensureTablesExist(pool: mysql.Pool): Promise<void> {
         loan_amount BIGINT NOT NULL,
         loan_date VARCHAR(10) NOT NULL,
         daily_installment BIGINT,
+        installment_frequency VARCHAR(10) DEFAULT 'DAILY' NOT NULL,
         status VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL,
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
