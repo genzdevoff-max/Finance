@@ -8,7 +8,7 @@ import {
 } from 'date-fns';
 import type { Collection } from '@/lib/db/schema';
 import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
-import { eq, sql, gte, lte, and } from 'drizzle-orm';
+import { desc, eq, sql, gte, lte, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export interface CollectionRecordDetail extends Collection {
@@ -298,44 +298,44 @@ export async function getTodayCollections() {
   if (isDbConfigured()) {
     try {
       const todayRows = await db
-        .select()
+        .select({
+          id: collections.id,
+          loanId: collections.loanId,
+          personId: collections.personId,
+          amount: collections.amount,
+          collectedAt: collections.collectedAt,
+          notes: collections.notes,
+          createdAt: collections.createdAt,
+          updatedAt: collections.updatedAt,
+          personName: sql<string>`COALESCE(${people.fullName}, 'Contact')`,
+          loanAmount: sql<string>`COALESCE(${loans.loanAmount}, 0)`,
+          loanDate: sql<string>`COALESCE(${loans.loanDate}, '')`,
+        })
         .from(collections)
+        .leftJoin(people, eq(people.id, collections.personId))
+        .leftJoin(loans, eq(loans.id, collections.loanId))
         .where(
           and(
             gte(collections.collectedAt, todayStart),
             lte(collections.collectedAt, todayEnd)
           )
-        );
+        )
+        .orderBy(desc(collections.collectedAt), desc(collections.id));
 
-      todayRows.sort((a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime());
       const totalCollectedToday = todayRows.reduce((sum, c) => sum + Number(c.amount), 0);
-
-      const items = [];
-      for (const c of todayRows) {
-        const [person] = await db
-          .select({ fullName: people.fullName })
-          .from(people)
-          .where(eq(people.id, c.personId));
-
-        const [loan] = await db
-          .select({ loanAmount: loans.loanAmount, loanDate: loans.loanDate })
-          .from(loans)
-          .where(eq(loans.id, c.loanId));
-
-        items.push({
-          id: c.id,
-          loanId: c.loanId,
-          personId: c.personId,
-          amount: Number(c.amount),
-          collectedAt: new Date(c.collectedAt),
-          notes: c.notes,
-          createdAt: new Date(c.createdAt),
-          updatedAt: new Date(c.updatedAt),
-          personName: person?.fullName || 'Contact',
-          loanAmount: loan ? Number(loan.loanAmount) : 0,
-          loanDate: loan?.loanDate || '',
-        });
-      }
+      const items = todayRows.map((c) => ({
+        id: c.id,
+        loanId: c.loanId,
+        personId: c.personId,
+        amount: Number(c.amount),
+        collectedAt: new Date(c.collectedAt),
+        notes: c.notes,
+        createdAt: new Date(c.createdAt),
+        updatedAt: new Date(c.updatedAt),
+        personName: c.personName,
+        loanAmount: Number(c.loanAmount),
+        loanDate: c.loanDate,
+      }));
 
       return {
         totalCollectedToday,
@@ -364,6 +364,8 @@ export interface HistoryQueryOptions {
   startDate?: string;
   endDate?: string;
   personId?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 /**
@@ -410,50 +412,74 @@ export async function getCollectionsHistory(options: HistoryQueryOptions = {}) {
         conditions.push(eq(collections.personId, options.personId));
       }
 
-      let query = db.select().from(collections);
-      if (conditions.length > 0) {
-        query = db
-          .select()
+      const rowsQuery = db
+        .select({
+          id: collections.id,
+          loanId: collections.loanId,
+          personId: collections.personId,
+          amount: collections.amount,
+          collectedAt: collections.collectedAt,
+          notes: collections.notes,
+          createdAt: collections.createdAt,
+          updatedAt: collections.updatedAt,
+          personName: sql<string>`COALESCE(${people.fullName}, 'Contact')`,
+          loanAmount: sql<string>`COALESCE(${loans.loanAmount}, 0)`,
+          loanDate: sql<string>`COALESCE(${loans.loanDate}, '')`,
+        })
+        .from(collections)
+        .leftJoin(people, eq(people.id, collections.personId))
+        .leftJoin(loans, eq(loans.id, collections.loanId))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(collections.collectedAt), desc(collections.id));
+
+      const shouldPaginate = options.page !== undefined || options.pageSize !== undefined;
+      const page = Math.max(1, Math.floor(options.page ?? 1));
+      const pageSize = Math.min(100, Math.max(1, Math.floor(options.pageSize ?? 50)));
+      let rows: Awaited<typeof rowsQuery>;
+      let totalCollected: number;
+      let count: number;
+
+      if (shouldPaginate) {
+        const summaryQuery = db
+          .select({
+            totalCollected: sql<string>`COALESCE(SUM(${collections.amount}), 0)`,
+            count: sql<string>`COUNT(${collections.id})`,
+          })
           .from(collections)
-          .where(and(...conditions)) as unknown as typeof query;
+          .where(conditions.length > 0 ? and(...conditions) : undefined);
+        const [pageRows, [summary]] = await Promise.all([
+          rowsQuery.limit(pageSize).offset((page - 1) * pageSize),
+          summaryQuery,
+        ]);
+        rows = pageRows;
+        totalCollected = Number(summary?.totalCollected ?? 0);
+        count = Number(summary?.count ?? 0);
+      } else {
+        rows = await rowsQuery;
+        totalCollected = rows.reduce((sum, c) => sum + Number(c.amount), 0);
+        count = rows.length;
       }
 
-      const rows = await query;
-      rows.sort((a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime());
-
-      const totalCollected = rows.reduce((sum, c) => sum + Number(c.amount), 0);
-      const items = [];
-
-      for (const c of rows) {
-        const [person] = await db
-          .select({ fullName: people.fullName })
-          .from(people)
-          .where(eq(people.id, c.personId));
-
-        const [loan] = await db
-          .select({ loanAmount: loans.loanAmount, loanDate: loans.loanDate })
-          .from(loans)
-          .where(eq(loans.id, c.loanId));
-
-        items.push({
-          id: c.id,
-          loanId: c.loanId,
-          personId: c.personId,
-          amount: Number(c.amount),
-          collectedAt: new Date(c.collectedAt),
-          notes: c.notes,
-          createdAt: new Date(c.createdAt),
-          updatedAt: new Date(c.updatedAt),
-          personName: person?.fullName || 'Contact',
-          loanAmount: loan ? Number(loan.loanAmount) : 0,
-          loanDate: loan?.loanDate || '',
-        });
-      }
+      const items = rows.map((c) => ({
+        id: c.id,
+        loanId: c.loanId,
+        personId: c.personId,
+        amount: Number(c.amount),
+        collectedAt: new Date(c.collectedAt),
+        notes: c.notes,
+        createdAt: new Date(c.createdAt),
+        updatedAt: new Date(c.updatedAt),
+        personName: c.personName,
+        loanAmount: Number(c.loanAmount),
+        loanDate: c.loanDate,
+      }));
 
       return {
         totalCollected,
-        count: rows.length,
+        count,
         items,
+        page,
+        pageSize,
       };
     } catch (err) {
       console.error('Database query failed in getCollectionsHistory:', err);

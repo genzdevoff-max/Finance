@@ -1,6 +1,6 @@
 import type { Loan } from '@/lib/db/schema';
 import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
-import { eq, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export interface LoanWithFinancials extends Loan {
@@ -22,6 +22,95 @@ export interface CollectionWithBalance {
   createdAt: Date;
   updatedAt: Date;
   remainingAfterCollection: number; // in paise
+}
+
+export interface PersonWithActiveLoansForCollection {
+  id: string;
+  fullName: string;
+  phone: string | null;
+  activeLoans: {
+    id: string;
+    loanAmount: number;
+    loanDate: string;
+    dailyInstallment: number | null;
+    installmentFrequency: Loan['installmentFrequency'];
+    remainingAmount: number;
+  }[];
+}
+
+/**
+ * Loads only people with a positive balance on an active loan in one query.
+ */
+export async function getPeopleWithActiveLoansForCollection(): Promise<
+  PersonWithActiveLoansForCollection[]
+> {
+  assertDbConfigured();
+  if (isDbConfigured()) {
+    try {
+      const collectionTotals = db
+        .select({
+          loanId: collections.loanId,
+          totalCollected: sql<string>`SUM(${collections.amount})`.as('total_collected'),
+        })
+        .from(collections)
+        .groupBy(collections.loanId)
+        .as('collection_totals');
+
+      const rows = await db
+        .select({
+          personId: people.id,
+          fullName: people.fullName,
+          phone: people.phone,
+          loanId: loans.id,
+          loanAmount: loans.loanAmount,
+          loanDate: loans.loanDate,
+          dailyInstallment: loans.dailyInstallment,
+          installmentFrequency: loans.installmentFrequency,
+          totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
+        })
+        .from(loans)
+        .innerJoin(people, eq(people.id, loans.personId))
+        .leftJoin(collectionTotals, eq(collectionTotals.loanId, loans.id))
+        .where(eq(loans.status, 'ACTIVE'))
+        .orderBy(people.fullName, desc(loans.loanDate));
+
+      const peopleById = new Map<string, PersonWithActiveLoansForCollection>();
+      for (const row of rows) {
+        const remainingAmount = Math.max(
+          0,
+          Number(row.loanAmount) - Number(row.totalCollected)
+        );
+        if (remainingAmount === 0) continue;
+
+        let person = peopleById.get(row.personId);
+        if (!person) {
+          person = {
+            id: row.personId,
+            fullName: row.fullName,
+            phone: row.phone,
+            activeLoans: [],
+          };
+          peopleById.set(row.personId, person);
+        }
+
+        person.activeLoans.push({
+          id: row.loanId,
+          loanAmount: Number(row.loanAmount),
+          loanDate: row.loanDate,
+          dailyInstallment: row.dailyInstallment === null ? null : Number(row.dailyInstallment),
+          installmentFrequency: row.installmentFrequency,
+          remainingAmount,
+        });
+      }
+
+      return Array.from(peopleById.values());
+    } catch (err) {
+      console.error('Database query failed in getPeopleWithActiveLoansForCollection:', err);
+      throw err;
+    }
+  }
+
+  throw new Error('DATABASE_URL is not configured.');
 }
 
 /**
@@ -157,58 +246,50 @@ export async function getLoansByPersonId(personId: string): Promise<LoanWithFina
   assertDbConfigured();
   if (isDbConfigured()) {
     try {
-      const personLoans = await db
-        .select()
+      const collectionTotals = db
+        .select({
+          loanId: collections.loanId,
+          totalCollected: sql<string>`SUM(${collections.amount})`.as('total_collected'),
+          collectionCount: sql<string>`COUNT(${collections.id})`.as('collection_count'),
+        })
+        .from(collections)
+        .groupBy(collections.loanId)
+        .as('collection_totals');
+
+      const rows = await db
+        .select({
+          loan: loans,
+          personName: people.fullName,
+          personPhone: people.phone,
+          totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
+          collectionCount: sql<string>`COALESCE(${collectionTotals.collectionCount}, 0)`,
+        })
         .from(loans)
-        .where(eq(loans.personId, personId));
+        .innerJoin(people, eq(people.id, loans.personId))
+        .leftJoin(collectionTotals, eq(collectionTotals.loanId, loans.id))
+        .where(eq(loans.personId, personId))
+        .orderBy(desc(loans.loanDate));
 
-      const [person] = await db
-        .select()
-        .from(people)
-        .where(eq(people.id, personId));
-
-      personLoans.sort((a, b) => new Date(b.loanDate).getTime() - new Date(a.loanDate).getTime());
-
-      const result: LoanWithFinancials[] = [];
-
-      for (const item of personLoans) {
-        const cols = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(${collections.amount}), 0)`,
-            count: sql<string>`COUNT(${collections.id})`,
-          })
-          .from(collections)
-          .where(eq(collections.loanId, item.id));
-
-        const totalCollected = Number(cols[0]?.total ?? 0);
-        const collectionCount = Number(cols[0]?.count ?? 0);
-        const remainingAmount = Math.max(0, Number(item.loanAmount) - totalCollected);
+      return rows.map(({ loan, personName, personPhone, totalCollected, collectionCount }) => {
+        const collected = Number(totalCollected);
+        const remainingAmount = Math.max(0, Number(loan.loanAmount) - collected);
         const percentageCollected =
-          Number(item.loanAmount) > 0
-            ? Math.min(100, Math.round((totalCollected / Number(item.loanAmount)) * 100))
+          Number(loan.loanAmount) > 0
+            ? Math.min(100, Math.round((collected / Number(loan.loanAmount)) * 100))
             : 0;
-
-        result.push({
-          id: item.id,
-          personId: item.personId,
-          loanAmount: Number(item.loanAmount),
-          loanDate: item.loanDate,
-          dailyInstallment: item.dailyInstallment ? Number(item.dailyInstallment) : null,
-          installmentFrequency: item.installmentFrequency,
-          status: item.status as 'ACTIVE' | 'COMPLETED',
-          notes: item.notes,
-          createdAt: new Date(item.createdAt),
-          updatedAt: new Date(item.updatedAt),
-          personName: person?.fullName || 'Contact',
-          personPhone: person?.phone || null,
-          totalCollected,
+        return {
+          ...loan,
+          loanAmount: Number(loan.loanAmount),
+          dailyInstallment: loan.dailyInstallment ? Number(loan.dailyInstallment) : null,
+          status: loan.status as 'ACTIVE' | 'COMPLETED',
+          personName: personName || 'Contact',
+          personPhone,
+          totalCollected: collected,
           remainingAmount,
           percentageCollected,
-          collectionCount,
-        });
-      }
-
-      return result;
+          collectionCount: Number(collectionCount),
+        };
+      });
     } catch (err) {
       console.error('Database query failed in getLoansByPersonId:', err);
       throw err;

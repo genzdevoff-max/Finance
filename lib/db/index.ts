@@ -52,9 +52,7 @@ export function getDb(): DrizzleDb {
       keepAliveInitialDelay: 10000,
     });
 
-  if (process.env.NODE_ENV !== 'production') {
-    global._mysqlPool = pool;
-  }
+  global._mysqlPool = pool;
 
   // Auto-create tables once in background if not already initialized
   if (!global._tablesInitialized) {
@@ -66,9 +64,7 @@ export function getDb(): DrizzleDb {
 
   const dbInstance = drizzle(pool, { schema, mode: 'default' });
 
-  if (process.env.NODE_ENV !== 'production') {
-    global._drizzleDb = dbInstance;
-  }
+  global._drizzleDb = dbInstance;
 
   return dbInstance;
 }

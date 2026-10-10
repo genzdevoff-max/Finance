@@ -1,7 +1,8 @@
+import { Suspense } from 'react';
 import { AddCollectionForm, type PersonWithLoansData } from '@/components/collections/AddCollectionForm';
 import { Header } from '@/components/shared/Header';
-import { getPeopleList } from '@/lib/services/people.service';
-import { getLoansByPersonId } from '@/lib/services/loans.service';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { getPeopleWithActiveLoansForCollection } from '@/lib/services/loans.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,37 +13,23 @@ interface NewCollectionPageProps {
   }>;
 }
 
-export default async function NewCollectionPage({ searchParams }: NewCollectionPageProps) {
+async function CollectionFormData({ searchParams }: NewCollectionPageProps) {
   const { personId, loanId } = await searchParams;
+  const peopleWithLoans: PersonWithLoansData[] =
+    await getPeopleWithActiveLoansForCollection();
 
-  const registeredPeople = await getPeopleList();
-  const peopleWithLoans = (
-    await Promise.all(
-      registeredPeople.map(async (person): Promise<PersonWithLoansData | null> => {
-        const loans = await getLoansByPersonId(person.id);
-        const activeLoans = loans
-          .filter((loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0)
-          .map((loan) => ({
-            id: loan.id,
-            loanAmount: loan.loanAmount,
-            loanDate: loan.loanDate,
-            dailyInstallment: loan.dailyInstallment,
-            installmentFrequency: loan.installmentFrequency,
-            remainingAmount: loan.remainingAmount,
-          }));
+  return (
+    <div className="p-4">
+      <AddCollectionForm
+        people={peopleWithLoans}
+        initialPersonId={personId}
+        initialLoanId={loanId}
+      />
+    </div>
+  );
+}
 
-        if (activeLoans.length === 0) return null;
-
-        return {
-          id: person.id,
-          fullName: person.fullName,
-          phone: person.phone,
-          activeLoans,
-        };
-      })
-    )
-  ).filter((person): person is PersonWithLoansData => person !== null);
-
+export default function NewCollectionPage(props: NewCollectionPageProps) {
   return (
     <div>
       <Header
@@ -50,14 +37,15 @@ export default async function NewCollectionPage({ searchParams }: NewCollectionP
         subtitle="Quick repayment entry"
         backHref="/dashboard"
       />
-
-      <div className="p-4">
-        <AddCollectionForm
-          people={peopleWithLoans}
-          initialPersonId={personId}
-          initialLoanId={loanId}
-        />
-      </div>
+      <Suspense
+        fallback={
+          <div className="p-4" aria-label="Loading collection form" role="status">
+            <Skeleton className="h-[32rem] w-full rounded-2xl" />
+          </div>
+        }
+      >
+        <CollectionFormData searchParams={props.searchParams} />
+      </Suspense>
     </div>
   );
 }

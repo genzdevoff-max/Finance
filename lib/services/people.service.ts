@@ -1,7 +1,7 @@
 import { getLoansByPersonId, type LoanWithFinancials } from './loans.service';
 import type { Person } from '@/lib/db/schema';
 import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
-import { eq, or, like, sql } from 'drizzle-orm';
+import { asc, eq, or, like, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export interface PersonWithFinancials extends Person {
@@ -24,70 +24,70 @@ export async function getPeopleList(searchQuery?: string): Promise<PersonWithFin
   assertDbConfigured();
   if (isDbConfigured()) {
     try {
-      let query = db.select().from(people);
+      const loanTotals = db
+        .select({
+          personId: loans.personId,
+          totalBorrowed: sql<string>`SUM(${loans.loanAmount})`.as('total_borrowed'),
+          activeLoansCount: sql<string>`SUM(CASE WHEN ${loans.status} = 'ACTIVE' THEN 1 ELSE 0 END)`.as(
+            'active_loans_count'
+          ),
+          completedLoansCount: sql<string>`SUM(CASE WHEN ${loans.status} != 'ACTIVE' THEN 1 ELSE 0 END)`.as(
+            'completed_loans_count'
+          ),
+          totalLoansCount: sql<string>`COUNT(${loans.id})`.as('total_loans_count'),
+        })
+        .from(loans)
+        .groupBy(loans.personId)
+        .as('loan_totals');
+      const collectionTotals = db
+        .select({
+          personId: collections.personId,
+          totalCollected: sql<string>`SUM(${collections.amount})`.as('total_collected'),
+        })
+        .from(collections)
+        .groupBy(collections.personId)
+        .as('collection_totals');
 
-      if (searchQuery && searchQuery.trim().length > 0) {
-        const term = `%${searchQuery.trim()}%`;
-        query = db
-          .select()
-          .from(people)
-          .where(or(like(people.fullName, term), like(people.phone, term))) as unknown as typeof query;
-      }
+      const query = db
+        .select({
+          id: people.id,
+          fullName: people.fullName,
+          phone: people.phone,
+          address: people.address,
+          notes: people.notes,
+          createdAt: people.createdAt,
+          updatedAt: people.updatedAt,
+          totalBorrowed: sql<string>`COALESCE(${loanTotals.totalBorrowed}, 0)`,
+          totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
+          activeLoansCount: sql<string>`COALESCE(${loanTotals.activeLoansCount}, 0)`,
+          completedLoansCount: sql<string>`COALESCE(${loanTotals.completedLoansCount}, 0)`,
+          totalLoansCount: sql<string>`COALESCE(${loanTotals.totalLoansCount}, 0)`,
+        })
+        .from(people)
+        .leftJoin(loanTotals, eq(loanTotals.personId, people.id))
+        .leftJoin(collectionTotals, eq(collectionTotals.personId, people.id));
 
-      const allPeople = await query.orderBy(people.fullName);
-      const results: PersonWithFinancials[] = [];
-
-      for (const person of allPeople) {
-        const loansList = await db
-          .select({
-            id: loans.id,
-            loanAmount: loans.loanAmount,
-            status: loans.status,
-          })
-          .from(loans)
-          .where(eq(loans.personId, person.id));
-
-        let totalBorrowed = 0;
-        let activeLoansCount = 0;
-        let completedLoansCount = 0;
-
-        for (const l of loansList) {
-          totalBorrowed += Number(l.loanAmount);
-          if (l.status === 'ACTIVE') {
-            activeLoansCount++;
-          } else {
-            completedLoansCount++;
-          }
-        }
-
-        const collectionsResult = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(${collections.amount}), 0)`,
-          })
-          .from(collections)
-          .where(eq(collections.personId, person.id));
-
-        const totalCollected = Number(collectionsResult[0]?.total ?? 0);
-        const totalOutstanding = Math.max(0, totalBorrowed - totalCollected);
-
-        results.push({
-          id: person.id,
-          fullName: person.fullName,
-          phone: person.phone,
-          address: person.address,
-          notes: person.notes,
+      const term = searchQuery?.trim();
+      const allPeople = term
+        ? await query
+            .where(or(like(people.fullName, `%${term}%`), like(people.phone, `%${term}%`)))
+            .orderBy(asc(people.fullName))
+        : await query.orderBy(asc(people.fullName));
+      return allPeople.map((person) => {
+        const totalBorrowed = Number(person.totalBorrowed);
+        const totalCollected = Number(person.totalCollected);
+        return {
+          ...person,
           createdAt: new Date(person.createdAt),
           updatedAt: new Date(person.updatedAt),
           totalBorrowed,
           totalCollected,
-          totalOutstanding,
-          activeLoansCount,
-          completedLoansCount,
-          totalLoansCount: loansList.length,
-        });
-      }
-
-      return results;
+          totalOutstanding: Math.max(0, totalBorrowed - totalCollected),
+          activeLoansCount: Number(person.activeLoansCount),
+          completedLoansCount: Number(person.completedLoansCount),
+          totalLoansCount: Number(person.totalLoansCount),
+        };
+      });
     } catch (err) {
       console.error('Database query failed in getPeopleList:', err);
       throw err;

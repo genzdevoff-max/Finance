@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { formatRupees } from '@/lib/utils/currency';
 import { formatDateDisplay, formatTimeDisplay } from '@/lib/utils/date';
 import { Card } from '@/components/ui/Card';
@@ -39,6 +39,8 @@ interface HistoryViewProps {
   initialItems: HistoryItem[];
   totalCollected: number;
   totalCount: number;
+  currentPage: number;
+  pageSize: number;
   peopleList: { id: string; fullName: string }[];
   currentRange: HistoryFilterRange;
   currentPersonId?: string;
@@ -50,6 +52,8 @@ export function HistoryView({
   initialItems,
   totalCollected,
   totalCount,
+  currentPage,
+  pageSize,
   peopleList,
   currentRange,
   currentPersonId,
@@ -57,7 +61,6 @@ export function HistoryView({
   currentEndDate,
 }: HistoryViewProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [selectedRange, setSelectedRange] = React.useState<HistoryFilterRange>(currentRange);
   const [selectedPerson, setSelectedPerson] = React.useState<string>(currentPersonId || 'all');
@@ -69,7 +72,13 @@ export function HistoryView({
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const applyFilters = (range: HistoryFilterRange, personId: string, start?: string, end?: string) => {
+  const applyFilters = (
+    range: HistoryFilterRange,
+    personId: string,
+    start?: string,
+    end?: string,
+    page = 1
+  ) => {
     const params = new URLSearchParams();
     if (range && range !== 'all') params.set('range', range);
     if (personId && personId !== 'all') params.set('personId', personId);
@@ -77,6 +86,7 @@ export function HistoryView({
       if (start) params.set('startDate', start);
       if (end) params.set('endDate', end);
     }
+    if (page > 1) params.set('page', String(page));
     router.push(`/history?${params.toString()}`);
   };
 
@@ -128,6 +138,9 @@ export function HistoryView({
   const customRangeInvalid =
     selectedRange === 'custom' &&
     (!customStart || !customEnd || customStart > customEnd);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const firstVisibleItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastVisibleItem = Math.min(currentPage * pageSize, totalCount);
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -147,7 +160,11 @@ export function HistoryView({
     }
 
     setItemToDelete(null);
-    router.refresh();
+    if (currentPage > 1 && initialItems.length === 1) {
+      applyFilters(selectedRange, selectedPerson, customStart, customEnd, currentPage - 1);
+    } else {
+      router.refresh();
+    }
   };
 
   const filterButtons: { label: string; range: HistoryFilterRange }[] = [
@@ -336,6 +353,38 @@ export function HistoryView({
               </div>
             </Card>
           ))}
+        </div>
+      )}
+
+      {totalCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+          <span className="text-xs font-medium text-slate-500">
+            Showing {firstVisibleItem}–{lastVisibleItem} of {totalCount}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() =>
+                applyFilters(selectedRange, selectedPerson, customStart, customEnd, currentPage - 1)
+              }
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() =>
+                applyFilters(selectedRange, selectedPerson, customStart, customEnd, currentPage + 1)
+              }
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
