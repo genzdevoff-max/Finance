@@ -1,9 +1,10 @@
-const CACHE_NAME = 'loan-tracker-v1';
+const CACHE_NAME = 'loan-tracker-v3';
 const STATIC_ASSETS = [
   '/',
   '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+  '/icons/finance-icon-192-v2.png',
+  '/icons/finance-icon-512-v2.png',
+  '/icons/finance-apple-icon-v2.png',
   '/icons/icon.svg',
 ];
 

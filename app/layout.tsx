@@ -13,8 +13,8 @@ export const metadata: Metadata = {
     title: 'FinanceTracker',
   },
   icons: {
-    icon: '/icons/icon-192.png',
-    apple: '/icons/apple-touch-icon.png',
+    icon: '/icons/finance-icon-192-v2.png',
+    apple: '/icons/finance-apple-icon-v2.png',
   },
 };
 
