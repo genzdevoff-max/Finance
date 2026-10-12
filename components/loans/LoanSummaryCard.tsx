@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { formatRupees } from '@/lib/utils/currency';
-import { formatDateDisplay } from '@/lib/utils/date';
+import { formatDateDisplay, formatPersonDisplayName, getLoanExpiryState } from '@/lib/utils/date';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { PlusCircle, User, Calendar, Clock } from 'lucide-react';
+import { PlusCircle, User, Calendar, Clock, AlertTriangle } from 'lucide-react';
 import type { LoanWithFinancials } from '@/lib/services/loans.service';
 import { installmentFrequencyLabel } from '@/lib/constants/installment';
 import { LoanScheduleEditor } from './LoanScheduleEditor';
@@ -14,6 +14,8 @@ interface LoanSummaryCardProps {
 }
 
 export function LoanSummaryCard({ loan }: LoanSummaryCardProps) {
+  const expiryState = getLoanExpiryState(loan.expectedEndDate || null);
+
   return (
     <div className="space-y-4">
       {/* Main Loan Highlight Card */}
@@ -24,7 +26,7 @@ export function LoanSummaryCard({ loan }: LoanSummaryCardProps) {
             className="flex items-center gap-1.5 font-bold text-slate-800 hover:text-emerald-700 transition-colors text-base"
           >
             <User className="h-4 w-4 text-emerald-600" />
-            <span>{loan.personName}</span>
+            <span>{formatPersonDisplayName(loan.personName, undefined)}</span>
           </Link>
           <Badge variant={loan.status === 'ACTIVE' ? 'active' : 'completed'}>
             {loan.status}
@@ -75,6 +77,14 @@ export function LoanSummaryCard({ loan }: LoanSummaryCardProps) {
             <Calendar className="h-4 w-4 text-slate-400" />
             <span>Loan Date: {formatDateDisplay(loan.loanDate)}</span>
           </div>
+          <div className="flex items-center gap-1.5 text-slate-600">
+            <Calendar className="h-4 w-4 text-slate-400" />
+            <span>Expected End: {loan.expectedEndDate ? formatDateDisplay(loan.expectedEndDate) : '—'}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-600">
+            <Clock className="h-4 w-4 text-slate-400" />
+            <span>Duration: {loan.durationDays ?? 0} days</span>
+          </div>
           {loan.dailyInstallment && (
             <div className="flex items-center gap-1.5 text-slate-600">
               <Clock className="h-4 w-4 text-emerald-600" />
@@ -83,10 +93,19 @@ export function LoanSummaryCard({ loan }: LoanSummaryCardProps) {
           )}
         </div>
 
+        <div className={`rounded-xl border px-3 py-2 text-xs font-medium ${expiryState.isExpired ? 'border-rose-200 bg-rose-50 text-rose-700' : expiryState.remainingDays <= 7 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{expiryState.label} • {expiryState.remainingDays} days remaining</span>
+          </div>
+        </div>
+
         <LoanScheduleEditor
           loanId={loan.id}
           frequency={loan.installmentFrequency}
           installmentPaise={loan.dailyInstallment}
+          durationDays={loan.durationDays}
+          loanDate={loan.loanDate}
           disabled={loan.status !== 'ACTIVE'}
         />
 

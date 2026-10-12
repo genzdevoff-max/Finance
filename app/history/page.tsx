@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import {
-  getCollectionsHistory,
+  getFinancialActivityHistory,
   type HistoryFilterRange,
 } from '@/lib/services/collections.service';
 import { getPeopleList } from '@/lib/services/people.service';
@@ -17,23 +17,25 @@ interface HistoryPageProps {
     startDate?: string;
     endDate?: string;
     page?: string;
+    search?: string;
   }>;
 }
 
 async function HistoryData({ searchParams }: HistoryPageProps) {
-  const { range = 'all', personId, startDate, endDate, page } = await searchParams;
+  const { range = 'all', personId, startDate, endDate, page, search } = await searchParams;
   const requestedPage = Number(page);
   const currentPage =
     Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
   const [historyResult, people] = await Promise.all([
-    getCollectionsHistory({
+    getFinancialActivityHistory({
       range,
       personId,
       startDate,
       endDate,
+      search,
       page: currentPage,
-      pageSize: 50,
+      pageSize: 25,
     }),
     getPeopleList(),
   ]);
@@ -48,6 +50,9 @@ async function HistoryData({ searchParams }: HistoryPageProps) {
       <HistoryView
         initialItems={historyResult.items}
         totalCollected={historyResult.totalCollected}
+        totalInvested={historyResult.totalInvested}
+        collectionCount={historyResult.collectionCount}
+        investmentCount={historyResult.investmentCount}
         totalCount={historyResult.count}
         currentPage={historyResult.page}
         pageSize={historyResult.pageSize}
@@ -56,6 +61,7 @@ async function HistoryData({ searchParams }: HistoryPageProps) {
         currentPersonId={personId}
         currentStartDate={startDate}
         currentEndDate={endDate}
+        currentSearch={search}
       />
     </div>
   );
@@ -65,8 +71,8 @@ export default function HistoryPage(props: HistoryPageProps) {
   return (
     <div>
       <Header
-        title="Collection History"
-        subtitle="All recorded repayments"
+        title="Financial Activity History"
+        subtitle="Loan investments and repayments"
       />
       <Suspense
         fallback={

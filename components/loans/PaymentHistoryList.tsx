@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { isBefore, startOfDay } from 'date-fns';
 import { formatRupees } from '@/lib/utils/currency';
 import { formatDateDisplay, formatTimeDisplay } from '@/lib/utils/date';
 import { Card } from '@/components/ui/Card';
@@ -94,6 +95,11 @@ export function PaymentHistoryList({
                   <span className="text-xs text-slate-500 font-medium">
                     {formatDateDisplay(item.collectedAt)} at {formatTimeDisplay(item.collectedAt)}
                   </span>
+                  {isBefore(startOfDay(item.collectedAt), startOfDay(item.createdAt)) && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                      Late Entry
+                    </span>
+                  )}
                 </div>
 
                 <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">

@@ -14,9 +14,9 @@ interface PersonFormProps {
   personId?: string;
   initialData?: {
     fullName: string;
+    work?: string | null;
     phone?: string | null;
     address?: string | null;
-    notes?: string | null;
   };
 }
 
@@ -33,9 +33,9 @@ export function PersonForm({ personId, initialData }: PersonFormProps) {
     resolver: zodResolver(personSchema),
     defaultValues: {
       fullName: initialData?.fullName || '',
+      work: initialData?.work || '',
       phone: initialData?.phone || '',
       address: initialData?.address || '',
-      notes: initialData?.notes || '',
     },
   });
 
@@ -77,8 +77,8 @@ export function PersonForm({ personId, initialData }: PersonFormProps) {
         )}
 
         <Input
-          label="Full Name *"
-          placeholder="e.g. Ramesh Kumar"
+          label="Name *"
+          placeholder="Enter name in English"
           {...register('fullName')}
           error={errors.fullName?.message}
           autoFocus
@@ -91,6 +91,13 @@ export function PersonForm({ personId, initialData }: PersonFormProps) {
           {...register('phone')}
           error={errors.phone?.message}
           hint="Optional. Used for quick reference and search."
+        />
+
+        <Input
+          label="Work"
+          placeholder="e.g. Shop owner"
+          {...register('work')}
+          error={errors.work?.message}
         />
 
         <div className="space-y-1.5">
@@ -106,22 +113,6 @@ export function PersonForm({ personId, initialData }: PersonFormProps) {
           />
           {errors.address?.message && (
             <p className="text-xs font-medium text-rose-600">{errors.address.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="notes" className="block text-sm font-semibold text-slate-700">
-            Notes
-          </label>
-          <textarea
-            id="notes"
-            rows={2}
-            placeholder="e.g. Morning vegetable market vendor"
-            className="flex w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            {...register('notes')}
-          />
-          {errors.notes?.message && (
-            <p className="text-xs font-medium text-rose-600">{errors.notes.message}</p>
           )}
         </div>
 

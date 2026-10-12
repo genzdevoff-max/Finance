@@ -32,9 +32,9 @@ export default async function EditPersonPage({ params }: EditPersonPageProps) {
           personId={person.id}
           initialData={{
             fullName: person.fullName,
+            work: person.work,
             phone: person.phone,
             address: person.address,
-            notes: person.notes,
           }}
         />
       </div>

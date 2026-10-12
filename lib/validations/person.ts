@@ -5,11 +5,26 @@ export const personSchema = z.object({
     .string()
     .trim()
     .min(2, { message: 'Full name must be at least 2 characters' })
-    .max(100, { message: 'Full name must not exceed 100 characters' }),
+    .max(100, { message: 'Full name must not exceed 100 characters' })
+    .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ .'-]*$/, {
+      message: 'Enter the name using English letters',
+    }),
+  work: z
+    .string()
+    .trim()
+    .max(100, { message: 'Work must not exceed 100 characters' })
+    .optional()
+    .or(z.literal('')),
   phone: z
     .string()
     .trim()
     .max(20, { message: 'Phone number is too long' })
+    .refine(
+      (value) =>
+        value.length === 0 ||
+        (/^\+?[\d\s().-]+$/.test(value) && value.replace(/\D/g, '').length >= 7),
+      { message: 'Enter a valid phone number' }
+    )
     .optional()
     .or(z.literal('')),
   address: z

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { Clock, ArrowRight, IndianRupee } from 'lucide-react';
 import { formatRupees } from '@/lib/utils/currency';
-import { formatTimeDisplay } from '@/lib/utils/date';
+import { formatPersonDisplayName, formatTimeDisplay } from '@/lib/utils/date';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/shared/EmptyState';
 
@@ -14,6 +14,7 @@ interface CollectionItem {
   personId: string;
   loanId: string;
   personName: string;
+  personTamilName?: string | null;
   amount: number;
   collectedAt: Date;
   notes: string | null;
@@ -94,7 +95,7 @@ export function CollectionsPeriodTabs({ today, week, month }: CollectionsPeriodT
                     href={`/people/${item.personId}`}
                     className="block truncate text-sm font-bold text-slate-900 transition-colors hover:text-emerald-700"
                   >
-                    {item.personName}
+                    {formatPersonDisplayName(item.personName, item.personTamilName)}
                   </Link>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
                     <span className="font-medium text-slate-400">

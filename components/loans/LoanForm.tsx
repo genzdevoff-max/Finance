@@ -34,6 +34,7 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
       personId: defaultPersonId || (people.length === 1 ? people[0].id : ''),
       loanAmount: undefined,
       loanDate: getTodayDateString(),
+      durationDays: 100,
       dailyInstallment: undefined,
       installmentFrequency: 'DAILY',
       notes: '',
@@ -54,6 +55,7 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
         personId: data.personId,
         loanAmount: Number(data.loanAmount),
         loanDate: data.loanDate,
+        durationDays: data.durationDays ? Number(data.durationDays) : null,
         dailyInstallment: data.dailyInstallment ? Number(data.dailyInstallment) : null,
         installmentFrequency: data.installmentFrequency,
         notes: data.notes,
@@ -127,6 +129,20 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
             type="date"
             {...register('loanDate')}
             error={errors.loanDate?.message}
+          />
+        </div>
+
+        <div>
+          <Input
+            label="Loan Duration (days) *"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            placeholder="e.g. 100"
+            {...register('durationDays', { valueAsNumber: true })}
+            error={errors.durationDays?.message}
+            hint="Expected end date is calculated automatically from the start date and this duration."
           />
         </div>
 

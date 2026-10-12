@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { getTodayDateString } from '@/lib/utils/date';
 
 export const collectionSchema = z.object({
   personId: z.string().uuid({ message: 'Valid person must be selected' }),
@@ -7,7 +8,14 @@ export const collectionSchema = z.object({
     .number({ invalid_type_error: 'Amount is required and must be a valid number' })
     .positive({ message: 'Collection amount must be greater than ₹0' })
     .max(100000000, { message: 'Amount is excessively large' }),
-  collectedAt: z.string().optional().nullable(),
+  collectedAt: z
+    .string()
+    .date()
+    .refine((value) => value <= getTodayDateString(), {
+      message: 'Collection date cannot be in the future',
+    })
+    .optional()
+    .nullable(),
   notes: z
     .string()
     .trim()

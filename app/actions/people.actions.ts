@@ -6,6 +6,7 @@ import { personSchema } from '@/lib/validations/person';
 
 export async function createPersonAction(data: {
   fullName: string;
+  work?: string | null;
   phone?: string | null;
   address?: string | null;
   notes?: string | null;
@@ -20,6 +21,7 @@ export async function createPersonAction(data: {
       person: {
         id: newPerson.id,
         fullName: newPerson.fullName,
+        work: newPerson.work,
         phone: newPerson.phone,
         address: newPerson.address,
         notes: newPerson.notes,
@@ -36,6 +38,7 @@ export async function updatePersonAction(
   id: string,
   data: {
     fullName: string;
+    work?: string | null;
     phone?: string | null;
     address?: string | null;
     notes?: string | null;
@@ -52,6 +55,7 @@ export async function updatePersonAction(
       person: {
         id: updated.id,
         fullName: updated.fullName,
+        work: updated.work,
         phone: updated.phone,
         address: updated.address,
         notes: updated.notes,

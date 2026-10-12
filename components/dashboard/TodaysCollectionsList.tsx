@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { formatRupees } from '@/lib/utils/currency';
-import { formatTimeDisplay } from '@/lib/utils/date';
+import { formatPersonDisplayName, formatTimeDisplay } from '@/lib/utils/date';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Clock, ArrowRight, IndianRupee } from 'lucide-react';
@@ -11,6 +11,7 @@ interface TodaysCollectionsListProps {
     personId: string;
     loanId: string;
     personName: string;
+    personTamilName?: string | null;
     amount: number;
     collectedAt: Date;
     notes: string | null;
@@ -56,7 +57,7 @@ export function TodaysCollectionsList({
                   href={`/people/${item.personId}`}
                   className="font-bold text-slate-900 hover:text-emerald-700 transition-colors block truncate text-sm"
                 >
-                  {item.personName}
+                  {formatPersonDisplayName(item.personName, item.personTamilName)}
                 </Link>
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
                   <span className="text-slate-400 font-medium">

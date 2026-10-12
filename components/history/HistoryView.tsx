@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { isBefore, startOfDay } from 'date-fns';
 import { formatRupees } from '@/lib/utils/currency';
 import { formatDateDisplay, formatTimeDisplay } from '@/lib/utils/date';
 import { Card } from '@/components/ui/Card';
@@ -21,23 +22,17 @@ import {
   IndianRupee,
   Download,
 } from 'lucide-react';
-import type { HistoryFilterRange } from '@/lib/services/collections.service';
-
-interface HistoryItem {
-  id: string;
-  loanId: string;
-  personId: string;
-  amount: number; // in paise
-  collectedAt: Date;
-  notes: string | null;
-  personName: string;
-  loanAmount: number; // in paise
-  loanDate: string;
-}
+import type {
+  HistoryActivity,
+  HistoryFilterRange,
+} from '@/lib/services/collections.service';
 
 interface HistoryViewProps {
-  initialItems: HistoryItem[];
+  initialItems: HistoryActivity[];
   totalCollected: number;
+  totalInvested: number;
+  collectionCount: number;
+  investmentCount: number;
   totalCount: number;
   currentPage: number;
   pageSize: number;
@@ -46,11 +41,15 @@ interface HistoryViewProps {
   currentPersonId?: string;
   currentStartDate?: string;
   currentEndDate?: string;
+  currentSearch?: string;
 }
 
 export function HistoryView({
   initialItems,
   totalCollected,
+  totalInvested,
+  collectionCount,
+  investmentCount,
   totalCount,
   currentPage,
   pageSize,
@@ -59,6 +58,7 @@ export function HistoryView({
   currentPersonId,
   currentStartDate,
   currentEndDate,
+  currentSearch,
 }: HistoryViewProps) {
   const router = useRouter();
 
@@ -66,29 +66,32 @@ export function HistoryView({
   const [selectedPerson, setSelectedPerson] = React.useState<string>(currentPersonId || 'all');
   const [customStart, setCustomStart] = React.useState<string>(currentStartDate || '');
   const [customEnd, setCustomEnd] = React.useState<string>(currentEndDate || '');
+  const [searchTerm, setSearchTerm] = React.useState(currentSearch || '');
 
   // Delete modal state
-  const [itemToDelete, setItemToDelete] = React.useState<HistoryItem | null>(null);
+  const [itemToDelete, setItemToDelete] = React.useState<HistoryActivity | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const applyFilters = (
+  const applyFilters = React.useCallback((
     range: HistoryFilterRange,
     personId: string,
     start?: string,
     end?: string,
-    page = 1
+    page = 1,
+    search = searchTerm
   ) => {
     const params = new URLSearchParams();
     if (range && range !== 'all') params.set('range', range);
     if (personId && personId !== 'all') params.set('personId', personId);
+    if (search.trim()) params.set('search', search.trim());
     if (range === 'custom') {
       if (start) params.set('startDate', start);
       if (end) params.set('endDate', end);
     }
     if (page > 1) params.set('page', String(page));
     router.push(`/history?${params.toString()}`);
-  };
+  }, [router, searchTerm]);
 
   const handleRangeChange = (range: HistoryFilterRange) => {
     setSelectedRange(range);
@@ -131,6 +134,10 @@ export function HistoryView({
       start = new Date(today.getFullYear(), today.getMonth(), 1);
       end = today;
     }
+    if (range === 'year') {
+      start = new Date(today.getFullYear(), 0, 1);
+      end = today;
+    }
     if (start) exportParams.set('startDate', date(start));
     if (end) exportParams.set('endDate', date(end));
   }
@@ -138,6 +145,7 @@ export function HistoryView({
   const customRangeInvalid =
     selectedRange === 'custom' &&
     (!customStart || !customEnd || customStart > customEnd);
+  const filteredItems = initialItems;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const firstVisibleItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastVisibleItem = Math.min(currentPage * pageSize, totalCount);
@@ -169,9 +177,9 @@ export function HistoryView({
 
   const filterButtons: { label: string; range: HistoryFilterRange }[] = [
     { label: 'Today', range: 'today' },
-    { label: 'Yesterday', range: 'yesterday' },
     { label: 'This Week', range: 'week' },
     { label: 'This Month', range: 'month' },
+    { label: 'This Year', range: 'year' },
     { label: 'All Time', range: 'all' },
     { label: 'Custom', range: 'custom' },
   ];
@@ -179,15 +187,27 @@ export function HistoryView({
   return (
     <div className="space-y-4">
       {/* Summary Banner */}
-      <div className="rounded-2xl bg-emerald-800 p-5 text-white shadow-md space-y-2">
-        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-emerald-200">
-          <span>Total Collected in Period</span>
-          <TrendingUp className="h-4 w-4 text-emerald-300" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl bg-emerald-800 p-5 text-white shadow-md space-y-2">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-emerald-200">
+            <span>Collected in Period</span>
+            <TrendingUp className="h-4 w-4 text-emerald-300" />
+          </div>
+          <div className="text-3xl font-black">{formatRupees(totalCollected)}</div>
+          <div className="text-xs text-emerald-200 border-t border-emerald-700/80 pt-2 flex items-center justify-between">
+            <span>{collectionCount} {collectionCount === 1 ? 'repayment' : 'repayments'}</span>
+            <span className="capitalize">{selectedRange}</span>
+          </div>
         </div>
-        <div className="text-3xl font-black">{formatRupees(totalCollected)}</div>
-        <div className="text-xs text-emerald-200 border-t border-emerald-700/80 pt-2 flex items-center justify-between">
-          <span>{totalCount} {totalCount === 1 ? 'transaction' : 'transactions'} recorded</span>
-          <span className="capitalize">{selectedRange}</span>
+        <div className="rounded-2xl bg-sky-800 p-5 text-white shadow-md space-y-2">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-sky-200">
+            <span>Invested in Period</span>
+            <IndianRupee className="h-4 w-4 text-sky-300" />
+          </div>
+          <div className="text-3xl font-black">{formatRupees(totalInvested)}</div>
+          <div className="text-xs text-sky-200 border-t border-sky-700/80 pt-2">
+            {investmentCount} {investmentCount === 1 ? 'loan issued' : 'loans issued'} during this period
+          </div>
         </div>
       </div>
 
@@ -209,6 +229,21 @@ export function HistoryView({
               {btn.label}
             </button>
           ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedRange('all');
+              setSelectedPerson('all');
+              setCustomStart('');
+              setCustomEnd('');
+              setSearchTerm('');
+              applyFilters('all', 'all', undefined, undefined, 1, '');
+            }}
+          >
+            Clear filters
+          </Button>
         </div>
 
         {/* Custom date range inputs */}
@@ -285,18 +320,58 @@ export function HistoryView({
         </div>
       )}
 
-      {/* Collection List */}
-      {initialItems.length === 0 ? (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          applyFilters(selectedRange, selectedPerson, customStart, customEnd, 1, searchTerm);
+        }}
+        className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+      >
+        <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Search financial activity
+        </label>
+        <div className="flex items-center gap-2">
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Name, phone, loan ID, collection ID..."
+            className="h-11"
+          />
+          <Button type="submit" size="sm" className="h-11 shrink-0">
+            Search
+          </Button>
+          {searchTerm && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                applyFilters(selectedRange, selectedPerson, customStart, customEnd, 1, '');
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </form>
+
+      {/* Activity List */}
+      {filteredItems.length === 0 ? (
         <EmptyState
           icon={History}
-          title="No collections in this period"
-          description="Try changing the date filter or select 'All Time' to see all transactions."
+          title={searchTerm ? 'No matching activity' : 'No activity in this period'}
+          description={
+            searchTerm
+              ? 'Try a different borrower name, loan ID, or date.'
+              : "Try changing the date filter or select 'All Time' to see all activity."
+          }
         />
       ) : (
         <div className="space-y-2.5">
-          {initialItems.map((item) => (
+          {filteredItems.map((item) => (
             <Card
-              key={item.id}
+              key={`${item.type}-${item.id}`}
               className="p-3.5 hover:border-slate-300 transition-colors bg-white flex items-center justify-between gap-3"
             >
               <div className="min-w-0 flex-1">
@@ -309,8 +384,26 @@ export function HistoryView({
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-slate-500">
                   <span className="font-medium text-slate-600">
-                    {formatDateDisplay(item.collectedAt)} • {formatTimeDisplay(item.collectedAt)}
+                    {formatDateDisplay(item.activityAt)}
+                    {item.type === 'collection' && ` • ${formatTimeDisplay(item.activityAt)}`}
                   </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    item.type === 'investment'
+                      ? 'bg-sky-100 text-sky-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    {item.type === 'investment' ? 'Loan Investment' : 'Repayment'}
+                  </span>
+                  {item.type === 'collection' &&
+                    isBefore(startOfDay(item.activityAt), startOfDay(item.createdAt)) && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                      Late Entry
+                    </span>
+                  )}
+                  {item.type === 'collection' && (
+                    <span>Entered {formatDateDisplay(item.createdAt)} at {formatTimeDisplay(item.createdAt)}</span>
+                  )}
+                  <span>Loan: {item.loanId.slice(0, 8)}</span>
                   {item.notes && (
                     <span className="truncate max-w-[150px] text-slate-400 italic">
                       ({item.notes})
@@ -321,7 +414,9 @@ export function HistoryView({
 
               <div className="flex items-center gap-2 shrink-0">
                 <div className="text-right">
-                  <div className="text-base font-extrabold text-emerald-700">
+                  <div className={`text-base font-extrabold ${
+                    item.type === 'investment' ? 'text-sky-700' : 'text-emerald-700'
+                  }`}>
                     {formatRupees(item.amount)}
                   </div>
                   <Link
@@ -332,24 +427,25 @@ export function HistoryView({
                   </Link>
                 </div>
 
-                {/* Edit & Delete actions */}
-                <div className="flex items-center gap-0.5 pl-1 border-l border-slate-100">
-                  <Link
-                    href={`/collections/${item.id}/edit`}
-                    aria-label="Edit collection"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                  >
-                    <Edit2 className="h-3.5 w-3.5" />
-                  </Link>
-                  <button
-                    type="button"
-                    aria-label="Delete collection"
-                    onClick={() => setItemToDelete(item)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                {item.type === 'collection' && (
+                  <div className="flex items-center gap-0.5 pl-1 border-l border-slate-100">
+                    <Link
+                      href={`/collections/${item.id}/edit`}
+                      aria-label="Edit collection"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label="Delete collection"
+                      onClick={() => setItemToDelete(item)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </Card>
           ))}

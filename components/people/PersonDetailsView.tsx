@@ -16,6 +16,7 @@ import {
   Trash2,
   Phone,
   MapPin,
+  BriefcaseBusiness,
   FileText,
   IndianRupee,
   Download,
@@ -75,6 +76,12 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
                   </a>
                 </div>
               )}
+              {person.work && (
+                <div className="flex items-center gap-1.5 text-slate-600">
+                  <BriefcaseBusiness className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span>{person.work}</span>
+                </div>
+              )}
               {person.address && (
                 <div className="flex items-center gap-1.5 text-slate-500">
                   <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
@@ -103,12 +110,6 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
             </button>
           </div>
         </div>
-
-        {person.notes && (
-          <div className="rounded-xl bg-slate-50 p-2.5 text-xs text-slate-600 border border-slate-100 italic">
-            {person.notes}
-          </div>
-        )}
 
         {/* Big Outstanding Callout */}
         <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 p-4 text-white">
@@ -169,6 +170,39 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
       </Card>
 
       {/* Loans Section */}
+      <div className="space-y-3">
+        <h3 className="text-base font-bold text-slate-900">Loan investments</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            ['Today', person.investedToday],
+            ['This week', person.investedThisWeek],
+            ['This month', person.investedThisMonth],
+            ['This year', person.investedThisYear],
+          ].map(([label, amount]) => (
+            <Card key={label} className="bg-white p-3">
+              <p className="text-[11px] font-semibold uppercase text-slate-500">{label}</p>
+              <p className="mt-1 text-lg font-extrabold text-slate-900">
+                {formatRupees(Number(amount))}
+              </p>
+            </Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <Card className="border-amber-200 bg-amber-50 p-3">
+            <p className="font-semibold text-amber-900">Expiring today</p>
+            <p className="mt-1 text-lg font-black text-amber-900">
+              {person.loans.filter((loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0 && loan.remainingDays === 0).length}
+            </p>
+          </Card>
+          <Card className="border-rose-200 bg-rose-50 p-3">
+            <p className="font-semibold text-rose-900">Overdue with balance</p>
+            <p className="mt-1 text-lg font-black text-rose-900">
+              {person.loans.filter((loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0 && loan.isExpired).length}
+            </p>
+          </Card>
+        </div>
+      </div>
+
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { formatRupees, formatRupeesPlain, rupeesToPaise } from '@/lib/utils/currency';
-import { formatDateDisplay, formatTimeDisplay } from '@/lib/utils/date';
+import { formatDateDisplay, formatTimeDisplay, getTodayDateString } from '@/lib/utils/date';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
@@ -18,6 +18,7 @@ interface EditCollectionFormProps {
     personName: string;
     amount: number; // in paise
     collectedAt: Date;
+    createdAt: Date;
     notes: string | null;
   };
   maxAllowedPaise: number;
@@ -32,6 +33,10 @@ export function EditCollectionForm({
   const originalRs = collection.amount / 100;
   const [amountStr, setAmountStr] = React.useState<string>(String(originalRs));
   const [notes, setNotes] = React.useState<string>(collection.notes || '');
+  const [collectedDate, setCollectedDate] = React.useState(() => {
+    const date = new Date(collection.collectedAt);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
@@ -62,6 +67,7 @@ export function EditCollectionForm({
     try {
       const res = await updateCollectionAction(collection.id, {
         amount: parsedRupees,
+        collectedAt: collectedDate,
         notes: notes.trim() || null,
         loanId: collection.loanId,
         personId: collection.personId,
@@ -89,8 +95,11 @@ export function EditCollectionForm({
         </div>
         <div className="text-base font-bold text-slate-900">{collection.personName}</div>
         <div className="text-xs text-slate-500">
-          Recorded on {formatDateDisplay(collection.collectedAt)} at{' '}
-          {formatTimeDisplay(collection.collectedAt)}
+          Actual collection date: {formatDateDisplay(collection.collectedAt)}
+        </div>
+        <div className="text-xs text-slate-500">
+          Entered on {formatDateDisplay(collection.createdAt)} at{' '}
+          {formatTimeDisplay(collection.createdAt)}
         </div>
       </div>
 
@@ -111,6 +120,15 @@ export function EditCollectionForm({
           className="text-xl font-bold h-13"
           autoFocus
           hint={`Max allowed for this loan: ${formatRupees(maxAllowedPaise)}`}
+        />
+
+        <Input
+          label="Actual Collection Date *"
+          type="date"
+          value={collectedDate}
+          max={getTodayDateString()}
+          onChange={(event) => setCollectedDate(event.target.value)}
+          required
         />
 
         {parsedRupees > 0 && !isAmountOver && (

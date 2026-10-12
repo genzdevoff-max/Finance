@@ -11,7 +11,7 @@ declare global {
   // eslint-disable-next-line no-var
   var _drizzleDb: DrizzleDb | undefined;
   // eslint-disable-next-line no-var
-  var _tablesInitialized: boolean | undefined;
+  var _tablesInitialization: Promise<void> | undefined;
 }
 
 export function isDbConfigured(): boolean {
@@ -54,11 +54,10 @@ export function getDb(): DrizzleDb {
 
   global._mysqlPool = pool;
 
-  // Auto-create tables once in background if not already initialized
-  if (!global._tablesInitialized) {
-    global._tablesInitialized = true;
-    ensureTablesExist(pool).catch((e) => {
-      console.warn('ensureTablesExist non-blocking notice:', e?.message || e);
+  if (!global._tablesInitialization) {
+    global._tablesInitialization = ensureTablesExist(pool);
+    void global._tablesInitialization.catch((error) => {
+      console.error('Database initialization failed:', error);
     });
   }
 
@@ -67,6 +66,11 @@ export function getDb(): DrizzleDb {
   global._drizzleDb = dbInstance;
 
   return dbInstance;
+}
+
+export async function ensureDbInitialized(): Promise<void> {
+  getDb();
+  await global._tablesInitialization;
 }
 
 // Proxied db instance for direct imports

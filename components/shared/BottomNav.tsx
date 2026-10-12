@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, History, Plus } from 'lucide-react';
+import { LayoutDashboard, Users, History, Plus, BellRing } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function BottomNav() {
@@ -26,6 +26,12 @@ export function BottomNav() {
       href: '/history',
       icon: History,
       isActive: pathname.startsWith('/history'),
+    },
+    {
+      label: 'Notifications',
+      href: '/notifications',
+      icon: BellRing,
+      isActive: pathname.startsWith('/notifications'),
     },
   ];
 
@@ -93,6 +99,21 @@ export function BottomNav() {
             className={cn('h-6 w-6 stroke-[2]', navItems[2].isActive && 'stroke-[2.5]')}
           />
           <span className="mt-1">History</span>
+        </Link>
+
+        <Link
+          href="/notifications"
+          className={cn(
+            'flex flex-col items-center justify-center flex-1 py-1 text-xs font-semibold transition-colors',
+            navItems[3].isActive
+              ? 'text-emerald-700'
+              : 'text-slate-500 hover:text-slate-900'
+          )}
+        >
+          <BellRing
+            className={cn('h-6 w-6 stroke-[2]', navItems[3].isActive && 'stroke-[2.5]')}
+          />
+          <span className="mt-1">Notifications</span>
         </Link>
       </div>
     </nav>

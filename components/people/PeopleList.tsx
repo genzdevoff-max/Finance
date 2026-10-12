@@ -2,30 +2,47 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatRupees } from '@/lib/utils/currency';
+import { formatPersonDisplayName } from '@/lib/utils/date';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Search, UserPlus, Users, ChevronRight, Phone } from 'lucide-react';
+import { Search, UserPlus, Users, ChevronRight, ChevronLeft, Phone } from 'lucide-react';
 import type { PersonWithFinancials } from '@/lib/services/people.service';
 
 interface PeopleListProps {
   initialPeople: PersonWithFinancials[];
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
+  currentSearch: string;
 }
 
-export function PeopleList({ initialPeople }: PeopleListProps) {
-  const [search, setSearch] = React.useState('');
+export function PeopleList({
+  initialPeople,
+  totalCount,
+  currentPage,
+  pageSize,
+  currentSearch,
+}: PeopleListProps) {
+  const router = useRouter();
+  const [search, setSearch] = React.useState(currentSearch);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const filteredPeople = React.useMemo(() => {
-    if (!search.trim()) return initialPeople;
-    const term = search.toLowerCase().trim();
-    return initialPeople.filter(
-      (p) =>
-        p.fullName.toLowerCase().includes(term) ||
-        (p.phone && p.phone.toLowerCase().includes(term))
-    );
-  }, [initialPeople, search]);
+  const applyFilters = React.useCallback((term: string, page = 1) => {
+    const params = new URLSearchParams();
+    if (term.trim()) params.set('search', term.trim());
+    if (page > 1) params.set('page', String(page));
+    router.push(`/people${params.size ? `?${params.toString()}` : ''}`);
+  }, [router]);
+
+  React.useEffect(() => {
+    if (search === currentSearch) return;
+    const timeout = window.setTimeout(() => applyFilters(search), 300);
+    return () => window.clearTimeout(timeout);
+  }, [applyFilters, currentSearch, search]);
 
   return (
     <div className="space-y-4">
@@ -50,7 +67,7 @@ export function PeopleList({ initialPeople }: PeopleListProps) {
       </div>
 
       {/* People list or empty states */}
-      {initialPeople.length === 0 ? (
+      {totalCount === 0 && !currentSearch ? (
         <EmptyState
           icon={Users}
           title="No people yet"
@@ -58,15 +75,15 @@ export function PeopleList({ initialPeople }: PeopleListProps) {
           actionHref="/people/new"
           actionText="Add Person"
         />
-      ) : filteredPeople.length === 0 ? (
+      ) : initialPeople.length === 0 ? (
         <EmptyState
           icon={Search}
           title="No matching people"
-          description={`No person found matching "${search}".`}
+          description={`No person found matching "${currentSearch}".`}
         />
       ) : (
         <div className="space-y-2.5">
-          {filteredPeople.map((person) => (
+          {initialPeople.map((person) => (
             <Link
               key={person.id}
               href={`/people/${person.id}`}
@@ -75,7 +92,7 @@ export function PeopleList({ initialPeople }: PeopleListProps) {
               <Card className="p-4 hover:border-slate-300 transition-colors flex items-center justify-between gap-3 bg-white">
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-slate-900 truncate text-base">
-                    {person.fullName}
+                    {formatPersonDisplayName(person.fullName, person.tamilName)}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-slate-500">
@@ -106,6 +123,36 @@ export function PeopleList({ initialPeople }: PeopleListProps) {
               </Card>
             </Link>
           ))}
+        </div>
+      )}
+
+      {totalCount > 0 && (
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <p className="text-xs text-slate-500">
+            Page {currentPage} of {totalPages} · {totalCount} people
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Previous page"
+              disabled={currentPage <= 1}
+              onClick={() => applyFilters(currentSearch, currentPage - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Next page"
+              disabled={currentPage >= totalPages}
+              onClick={() => applyFilters(currentSearch, currentPage + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

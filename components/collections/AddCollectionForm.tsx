@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatRupees, formatRupeesPlain, rupeesToPaise } from '@/lib/utils/currency';
-import { formatDateDisplay } from '@/lib/utils/date';
+import { formatDateDisplay, getTodayDateString } from '@/lib/utils/date';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
@@ -74,6 +74,7 @@ export function AddCollectionForm({
   // Amount in rupees
   const [amountStr, setAmountStr] = React.useState<string>('');
   const [notes, setNotes] = React.useState<string>('');
+  const [collectedDate, setCollectedDate] = React.useState(getTodayDateString);
 
   // Confirmation modal state
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
@@ -148,6 +149,7 @@ export function AddCollectionForm({
         personId: currentPerson.id,
         loanId: currentLoan.id,
         amount: parsedRupees,
+        collectedAt: collectedDate,
         notes: notes.trim() || undefined,
       });
 
@@ -176,6 +178,7 @@ export function AddCollectionForm({
     setSuccessInfo(null);
     setAmountStr('');
     setNotes('');
+    setCollectedDate(getTodayDateString());
   };
 
   // If successfully recorded
@@ -339,6 +342,26 @@ export function AddCollectionForm({
                 autoFocus
                 className="text-xl font-bold h-13"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="collectedDate" className="block text-sm font-semibold text-slate-700">
+                Actual Collection Date *
+              </label>
+              <input
+                id="collectedDate"
+                type="date"
+                value={collectedDate}
+                max={getTodayDateString()}
+                onChange={(event) => setCollectedDate(event.target.value)}
+                className="flex h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-base text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                required
+              />
+              {collectedDate < getTodayDateString() && (
+                <p className="text-xs font-semibold text-amber-700">
+                  This will be marked as a Late Entry.
+                </p>
+              )}
             </div>
 
             {/* Live Calculation Feedback */}

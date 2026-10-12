@@ -8,6 +8,8 @@ import {
 } from '@/lib/services/collections.service';
 import { collectionSchema } from '@/lib/validations/collection';
 import { rupeesToPaise } from '@/lib/utils/currency';
+import { getTodayDateString, parseDateString } from '@/lib/utils/date';
+import { notifyLoanCompleted } from '@/lib/services/notifications.service';
 
 export async function createCollectionAction(data: {
   personId: string;
@@ -20,7 +22,12 @@ export async function createCollectionAction(data: {
     const validated = collectionSchema.parse(data);
     const amountPaise = rupeesToPaise(validated.amount);
 
-    const collectedAtDate = validated.collectedAt ? new Date(validated.collectedAt) : new Date();
+    const collectedAtDate = validated.collectedAt
+      ? parseDateString(validated.collectedAt)
+      : new Date();
+    if (validated.collectedAt && !collectedAtDate) {
+      return { success: false, error: 'Collection date is invalid.' };
+    }
 
     const newCollection = await createCollection({
       personId: validated.personId,
@@ -30,7 +37,16 @@ export async function createCollectionAction(data: {
       notes: validated.notes,
     });
 
+    if (newCollection.completed) {
+      try {
+        await notifyLoanCompleted(validated.loanId);
+      } catch (error) {
+        console.error('Loan was repaid, but its notification could not be saved:', error);
+      }
+    }
+
     revalidatePath('/dashboard');
+    revalidatePath('/notifications');
     revalidatePath('/history');
     revalidatePath('/people');
     revalidatePath(`/people/${validated.personId}`);
@@ -61,7 +77,13 @@ export async function updateCollectionAction(
     }
 
     const amountPaise = rupeesToPaise(data.amount);
-    const collectedAtDate = data.collectedAt ? new Date(data.collectedAt) : undefined;
+    const collectedAtDate = data.collectedAt ? parseDateString(data.collectedAt) : undefined;
+    if (
+      data.collectedAt &&
+      (!collectedAtDate || data.collectedAt > getTodayDateString())
+    ) {
+      return { success: false, error: 'Choose a valid collection date that is not in the future.' };
+    }
 
     const updated = await updateCollection(collectionId, {
       amountPaise,
@@ -69,7 +91,16 @@ export async function updateCollectionAction(
       notes: data.notes,
     });
 
+    if (updated.completed) {
+      try {
+        await notifyLoanCompleted(updated.loanId);
+      } catch (error) {
+        console.error('Loan was updated, but its completion notification could not be saved:', error);
+      }
+    }
+
     revalidatePath('/dashboard');
+    revalidatePath('/notifications');
     revalidatePath('/history');
     revalidatePath('/people');
     if (data.personId) revalidatePath(`/people/${data.personId}`);
@@ -92,6 +123,7 @@ export async function deleteCollectionAction(
     await deleteCollection(collectionId);
 
     revalidatePath('/dashboard');
+    revalidatePath('/notifications');
     revalidatePath('/history');
     revalidatePath('/people');
     if (meta?.personId) revalidatePath(`/people/${meta.personId}`);

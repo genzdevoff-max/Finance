@@ -85,6 +85,11 @@ export async function createHistoryWorkbook(options: HistoryWorkbookOptions = {}
   includedCollections.sort(
     (a, b) => new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime()
   );
+  const includedInvestments = scopedLoans.filter(
+    (loan) =>
+      (!start || loan.loanDate >= start.toISOString().slice(0, 10)) &&
+      (!end || loan.loanDate <= end.toISOString().slice(0, 10))
+  );
 
   if (options.personId && !personMap.has(options.personId)) {
     throw new Error('Person not found.');
@@ -114,9 +119,10 @@ export async function createHistoryWorkbook(options: HistoryWorkbookOptions = {}
 
   const collectionHistory = workbook.addWorksheet('Collection History');
   collectionHistory.columns = [
+    { header: 'Activity Type', key: 'type', width: 18 },
     { header: 'Date', key: 'date', width: 20 },
     { header: 'Customer', key: 'customer', width: 26 },
-    { header: 'Amount Collected (₹)', key: 'amount', width: 22 },
+    { header: 'Amount (₹)', key: 'amount', width: 22 },
     { header: 'Payment Mode', key: 'paymentMode', width: 18 },
     { header: 'Payment Status', key: 'paymentStatus', width: 18 },
   ];
@@ -161,16 +167,28 @@ export async function createHistoryWorkbook(options: HistoryWorkbookOptions = {}
     });
   }
 
-  for (const collection of includedCollections) {
-    const customer = personMap.get(collection.personId);
-    if (!customer) continue;
-    collectionHistory.addRow({
+  const activityRows = [
+    ...includedInvestments.map((loan) => ({
+      type: 'Loan Investment',
+      date: new Date(`${loan.loanDate}T00:00:00.000Z`),
+      customer: personMap.get(loan.personId)?.fullName,
+      amount: Number(loan.loanAmount) / 100,
+      paymentMode: 'N/A',
+      paymentStatus: 'Issued',
+    })),
+    ...includedCollections.map((collection) => ({
+      type: 'Repayment',
       date: new Date(collection.collectedAt),
-      customer: customer.fullName,
+      customer: personMap.get(collection.personId)?.fullName,
       amount: Number(collection.amount) / 100,
       paymentMode: 'Not recorded',
       paymentStatus: 'Successful',
-    });
+    })),
+  ].filter((activity) => activity.customer)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  for (const activity of activityRows) {
+    collectionHistory.addRow(activity);
   }
 
   styleTable(loanSummary);
@@ -191,7 +209,7 @@ export async function createHistoryWorkbook(options: HistoryWorkbookOptions = {}
     loanSummary.getCell(row, 4).numFmt = dateFormat;
   }
   for (let row = 2; row <= collectionHistory.rowCount; row++) {
-    collectionHistory.getCell(row, 1).numFmt = 'dd mmm yyyy hh:mm';
+    collectionHistory.getCell(row, 2).numFmt = 'dd mmm yyyy hh:mm';
   }
 
   return workbook;

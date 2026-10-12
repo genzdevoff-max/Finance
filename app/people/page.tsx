@@ -1,21 +1,37 @@
-import { getPeopleList, type PersonWithFinancials } from '@/lib/services/people.service';
+import { getPeopleListPage } from '@/lib/services/people.service';
 import { PeopleList } from '@/components/people/PeopleList';
 import { Header } from '@/components/shared/Header';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PeoplePage() {
-  const peopleList: PersonWithFinancials[] = await getPeopleList();
+interface PeoplePageProps {
+  searchParams: Promise<{ page?: string; search?: string }>;
+}
+
+export default async function PeoplePage({ searchParams }: PeoplePageProps) {
+  const params = await searchParams;
+  const requestedPage = Number(params.page);
+  const page =
+    Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const search = params.search?.trim() || '';
+  const pageSize = 25;
+  const result = await getPeopleListPage(search, page, pageSize);
 
   return (
     <div>
       <Header
         title="People"
-        subtitle={`${peopleList.length} ${peopleList.length === 1 ? 'person' : 'people'} registered`}
+        subtitle={`${result.totalCount} ${result.totalCount === 1 ? 'person' : 'people'} registered`}
       />
 
       <div className="p-4">
-        <PeopleList initialPeople={peopleList} />
+        <PeopleList
+          initialPeople={result.items}
+          totalCount={result.totalCount}
+          currentPage={result.currentPage}
+          pageSize={pageSize}
+          currentSearch={search}
+        />
       </div>
     </div>
   );

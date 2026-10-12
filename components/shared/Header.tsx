@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface HeaderProps {
   title: string;
@@ -50,7 +51,10 @@ export function Header({ title, subtitle, backHref, onBack, action }: HeaderProp
           </div>
         </div>
 
-        {action && <div className="shrink-0">{action}</div>}
+        <div className="flex shrink-0 items-center gap-1">
+          <NotificationBell />
+          {action}
+        </div>
       </div>
     </header>
   );

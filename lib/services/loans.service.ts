@@ -2,10 +2,16 @@ import type { Loan } from '@/lib/db/schema';
 import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
 import { desc, eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { addDaysToDateString, getLoanExpiryState } from '@/lib/utils/date';
 
 export interface LoanWithFinancials extends Loan {
   personName: string;
   personPhone: string | null;
+  durationDays: number | null;
+  expectedEndDate: string | null;
+  remainingDays: number;
+  isExpired: boolean;
+  expiryLabel: string;
   totalCollected: number; // in paise
   remainingAmount: number; // in paise
   percentageCollected: number; // 0 - 100
@@ -209,11 +215,14 @@ export async function getLoanById(id: string) {
             ? Math.min(100, Math.round((totalCollected / Number(loanRecord.loanAmount)) * 100))
             : 0;
 
+        const expiry = getLoanExpiryState(loanRecord.expectedEndDate || addDaysToDateString(loanRecord.loanDate, loanRecord.durationDays ?? 0) || null);
         return {
           id: loanRecord.id,
           personId: loanRecord.personId,
           loanAmount: Number(loanRecord.loanAmount),
           loanDate: loanRecord.loanDate,
+          durationDays: loanRecord.durationDays ?? null,
+          expectedEndDate: loanRecord.expectedEndDate || addDaysToDateString(loanRecord.loanDate, loanRecord.durationDays ?? 0) || null,
           dailyInstallment: loanRecord.dailyInstallment ? Number(loanRecord.dailyInstallment) : null,
           installmentFrequency: loanRecord.installmentFrequency,
           status: loanRecord.status as 'ACTIVE' | 'COMPLETED',
@@ -222,6 +231,9 @@ export async function getLoanById(id: string) {
           updatedAt: new Date(loanRecord.updatedAt),
           personName: person?.fullName || 'Contact',
           personPhone: person?.phone || null,
+          remainingDays: expiry.remainingDays,
+          isExpired: expiry.isExpired,
+          expiryLabel: expiry.label,
           totalCollected,
           remainingAmount,
           percentageCollected,
@@ -277,13 +289,21 @@ export async function getLoansByPersonId(personId: string): Promise<LoanWithFina
           Number(loan.loanAmount) > 0
             ? Math.min(100, Math.round((collected / Number(loan.loanAmount)) * 100))
             : 0;
+        const expectedEndDate =
+          loan.expectedEndDate || addDaysToDateString(loan.loanDate, loan.durationDays ?? 0) || null;
+        const expiry = getLoanExpiryState(expectedEndDate);
         return {
           ...loan,
           loanAmount: Number(loan.loanAmount),
+          durationDays: loan.durationDays ?? null,
+          expectedEndDate,
           dailyInstallment: loan.dailyInstallment ? Number(loan.dailyInstallment) : null,
           status: loan.status as 'ACTIVE' | 'COMPLETED',
           personName: personName || 'Contact',
           personPhone,
+          remainingDays: expiry.remainingDays,
+          isExpired: expiry.isExpired,
+          expiryLabel: expiry.label,
           totalCollected: collected,
           remainingAmount,
           percentageCollected,
@@ -306,6 +326,7 @@ export async function createLoan(data: {
   personId: string;
   loanAmountPaise: number;
   loanDate: string;
+  durationDays?: number | null;
   dailyInstallmentPaise?: number | null;
   installmentFrequency: Loan['installmentFrequency'];
   notes?: string | null;
@@ -313,6 +334,8 @@ export async function createLoan(data: {
   assertDbConfigured();
   const newId = randomUUID();
   const now = new Date();
+  const normalizedDuration = data.durationDays !== undefined && data.durationDays !== null ? Math.max(1, Math.round(Number(data.durationDays))) : null;
+  const expectedEndDate = normalizedDuration ? addDaysToDateString(data.loanDate, normalizedDuration) : null;
 
   if (isDbConfigured()) {
     try {
@@ -321,6 +344,8 @@ export async function createLoan(data: {
         personId: data.personId,
         loanAmount: data.loanAmountPaise,
         loanDate: data.loanDate,
+        durationDays: normalizedDuration,
+        expectedEndDate,
         dailyInstallment: data.dailyInstallmentPaise || null,
         installmentFrequency: data.installmentFrequency,
         status: 'ACTIVE',
@@ -332,6 +357,8 @@ export async function createLoan(data: {
         personId: data.personId,
         loanAmount: data.loanAmountPaise,
         loanDate: data.loanDate,
+        durationDays: normalizedDuration,
+        expectedEndDate,
         dailyInstallment: data.dailyInstallmentPaise || null,
         installmentFrequency: data.installmentFrequency,
         status: 'ACTIVE' as const,
@@ -352,6 +379,7 @@ export async function updateLoanSchedule(data: {
   loanId: string;
   installmentPaise: number | null;
   installmentFrequency: Loan['installmentFrequency'];
+  durationDays?: number | null;
 }) {
   assertDbConfigured();
   if (data.installmentPaise !== null && data.installmentPaise <= 0) {
@@ -362,10 +390,20 @@ export async function updateLoanSchedule(data: {
     const [existingLoan] = await db.select().from(loans).where(eq(loans.id, data.loanId));
     if (!existingLoan) throw new Error('Loan not found.');
 
+    const normalizedDuration =
+      data.durationDays !== undefined && data.durationDays !== null
+        ? Math.max(1, Math.round(Number(data.durationDays)))
+        : existingLoan.durationDays ?? null;
+    const updatedEndDate = normalizedDuration
+      ? addDaysToDateString(existingLoan.loanDate, normalizedDuration)
+      : existingLoan.expectedEndDate;
+
     const now = new Date();
     await db
       .update(loans)
       .set({
+        durationDays: normalizedDuration,
+        expectedEndDate: updatedEndDate,
         dailyInstallment: data.installmentPaise,
         installmentFrequency: data.installmentFrequency,
         updatedAt: now,
@@ -374,6 +412,8 @@ export async function updateLoanSchedule(data: {
 
     return {
       loanId: data.loanId,
+      durationDays: normalizedDuration,
+      expectedEndDate: updatedEndDate,
       dailyInstallment: data.installmentPaise,
       installmentFrequency: data.installmentFrequency,
     };

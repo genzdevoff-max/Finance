@@ -11,6 +11,12 @@ export const loanSchema = z.object({
     .string()
     .min(1, { message: 'Loan date is required' })
     .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Loan date must be YYYY-MM-DD' }),
+  durationDays: z
+    .number({ invalid_type_error: 'Duration must be a valid positive number' })
+    .int({ message: 'Duration must be a whole number of days' })
+    .positive({ message: 'Duration must be greater than 0 days' })
+    .optional()
+    .nullable(),
   dailyInstallment: z.number().positive().optional().nullable(),
   installmentFrequency: z.enum(installmentFrequencies).default('DAILY'),
   notes: z

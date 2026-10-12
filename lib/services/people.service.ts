@@ -1,8 +1,18 @@
 import { getLoansByPersonId, type LoanWithFinancials } from './loans.service';
 import type { Person } from '@/lib/db/schema';
-import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
-import { asc, eq, or, like, sql } from 'drizzle-orm';
+import {
+  db,
+  people,
+  loans,
+  collections,
+  isDbConfigured,
+  assertDbConfigured,
+  ensureDbInitialized,
+} from '@/lib/db';
+import { asc, eq, inArray, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { format, startOfMonth, startOfWeek } from 'date-fns';
+import { getTodayDateString } from '@/lib/utils/date';
 
 export interface PersonWithFinancials extends Person {
   totalBorrowed: number; // in paise
@@ -15,6 +25,10 @@ export interface PersonWithFinancials extends Person {
 
 export interface PersonDetail extends PersonWithFinancials {
   loans: LoanWithFinancials[];
+  investedToday: number;
+  investedThisWeek: number;
+  investedThisMonth: number;
+  investedThisYear: number;
 }
 
 /**
@@ -52,7 +66,9 @@ export async function getPeopleList(searchQuery?: string): Promise<PersonWithFin
         .select({
           id: people.id,
           fullName: people.fullName,
+          tamilName: people.tamilName,
           phone: people.phone,
+          work: people.work,
           address: people.address,
           notes: people.notes,
           createdAt: people.createdAt,
@@ -70,7 +86,12 @@ export async function getPeopleList(searchQuery?: string): Promise<PersonWithFin
       const term = searchQuery?.trim();
       const allPeople = term
         ? await query
-            .where(or(like(people.fullName, `%${term}%`), like(people.phone, `%${term}%`)))
+            .where(
+              or(
+                sql`LOWER(${people.fullName}) LIKE ${`%${term.toLowerCase()}%`}`,
+                sql`LOWER(${people.phone}) LIKE ${`%${term.toLowerCase()}%`}`
+              )
+            )
             .orderBy(asc(people.fullName))
         : await query.orderBy(asc(people.fullName));
       return allPeople.map((person) => {
@@ -92,9 +113,107 @@ export async function getPeopleList(searchQuery?: string): Promise<PersonWithFin
       console.error('Database query failed in getPeopleList:', err);
       throw err;
     }
+
   }
 
   throw new Error('DATABASE_URL is not configured.');
+}
+
+export async function getPeopleListPage(
+  searchQuery: string | undefined,
+  page: number,
+  pageSize: number
+): Promise<{ items: PersonWithFinancials[]; totalCount: number; currentPage: number }> {
+  assertDbConfigured();
+  if (!isDbConfigured()) throw new Error('DATABASE_URL is not configured.');
+  await ensureDbInitialized();
+
+  try {
+    const term = searchQuery?.trim();
+    const normalizedTerm = term?.toLowerCase();
+    const filter = normalizedTerm
+      ? or(
+          sql`LOWER(${people.fullName}) LIKE ${`%${normalizedTerm}%`}`,
+          sql`LOWER(${people.phone}) LIKE ${`%${normalizedTerm}%`}`
+        )
+      : undefined;
+    const requestedPage = Math.max(1, page);
+    const [countResult, requestedPagePeople] = await Promise.all([
+      db.select({ count: sql<number>`COUNT(*)` }).from(people).where(filter),
+      db
+        .select()
+        .from(people)
+        .where(filter)
+        .orderBy(asc(people.fullName), asc(people.id))
+        .limit(pageSize)
+        .offset((requestedPage - 1) * pageSize),
+    ]);
+    const totalCount = Number(countResult[0]?.count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const currentPage = Math.min(requestedPage, totalPages);
+    const pagePeople =
+      currentPage === requestedPage
+        ? requestedPagePeople
+        : await db
+            .select()
+            .from(people)
+            .where(filter)
+            .orderBy(asc(people.fullName), asc(people.id))
+            .limit(pageSize)
+            .offset((currentPage - 1) * pageSize);
+    if (pagePeople.length === 0) return { items: [], totalCount, currentPage };
+
+    const personIds = pagePeople.map((person) => person.id);
+    const [loanTotals, collectionTotals] = await Promise.all([
+      db
+        .select({
+          personId: loans.personId,
+          totalBorrowed: sql<string>`SUM(${loans.loanAmount})`,
+          activeLoansCount: sql<string>`SUM(CASE WHEN ${loans.status} = 'ACTIVE' THEN 1 ELSE 0 END)`,
+          completedLoansCount: sql<string>`SUM(CASE WHEN ${loans.status} != 'ACTIVE' THEN 1 ELSE 0 END)`,
+          totalLoansCount: sql<string>`COUNT(${loans.id})`,
+        })
+        .from(loans)
+        .where(inArray(loans.personId, personIds))
+        .groupBy(loans.personId),
+      db
+        .select({
+          personId: collections.personId,
+          totalCollected: sql<string>`SUM(${collections.amount})`,
+        })
+        .from(collections)
+        .where(inArray(collections.personId, personIds))
+        .groupBy(collections.personId),
+    ]);
+
+    const loanTotalsByPerson = new Map(loanTotals.map((totals) => [totals.personId, totals]));
+    const collectionTotalsByPerson = new Map(
+      collectionTotals.map((totals) => [totals.personId, Number(totals.totalCollected)])
+    );
+    return {
+      totalCount,
+      currentPage,
+      items: pagePeople.map((person) => {
+        const totals = loanTotalsByPerson.get(person.id);
+        const totalBorrowed = Number(totals?.totalBorrowed ?? 0);
+        const totalCollected = collectionTotalsByPerson.get(person.id) ?? 0;
+        return {
+          ...person,
+          createdAt: new Date(person.createdAt),
+          updatedAt: new Date(person.updatedAt),
+          totalBorrowed,
+          totalCollected,
+          totalOutstanding: Math.max(0, totalBorrowed - totalCollected),
+          activeLoansCount: Number(totals?.activeLoansCount ?? 0),
+          completedLoansCount: Number(totals?.completedLoansCount ?? 0),
+          totalLoansCount: Number(totals?.totalLoansCount ?? 0),
+        };
+      }),
+    };
+  } catch (error) {
+    console.error('Database query failed in getPeopleListPage:', error);
+    throw error;
+  }
 }
 
 /**
@@ -116,10 +235,22 @@ export async function getPersonById(id: string): Promise<PersonDetail | null> {
         let totalCollected = 0;
         let activeLoansCount = 0;
         let completedLoansCount = 0;
+        const today = getTodayDateString();
+        const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+        const yearStart = `${new Date().getFullYear()}-01-01`;
+        let investedToday = 0;
+        let investedThisWeek = 0;
+        let investedThisMonth = 0;
+        let investedThisYear = 0;
 
         for (const l of personLoans) {
           totalBorrowed += l.loanAmount;
           totalCollected += l.totalCollected;
+          if (l.loanDate === today) investedToday += l.loanAmount;
+          if (l.loanDate >= weekStart && l.loanDate <= today) investedThisWeek += l.loanAmount;
+          if (l.loanDate >= monthStart && l.loanDate <= today) investedThisMonth += l.loanAmount;
+          if (l.loanDate >= yearStart && l.loanDate <= today) investedThisYear += l.loanAmount;
           if (l.status === 'ACTIVE') {
             activeLoansCount++;
           } else {
@@ -132,7 +263,9 @@ export async function getPersonById(id: string): Promise<PersonDetail | null> {
         return {
           id: personRecord.id,
           fullName: personRecord.fullName,
+          tamilName: personRecord.tamilName,
           phone: personRecord.phone,
+          work: personRecord.work,
           address: personRecord.address,
           notes: personRecord.notes,
           createdAt: new Date(personRecord.createdAt),
@@ -144,6 +277,10 @@ export async function getPersonById(id: string): Promise<PersonDetail | null> {
           completedLoansCount,
           totalLoansCount: personLoans.length,
           loans: personLoans,
+          investedToday,
+          investedThisWeek,
+          investedThisMonth,
+          investedThisYear,
         };
       }
       return null;
@@ -161,6 +298,7 @@ export async function getPersonById(id: string): Promise<PersonDetail | null> {
  */
 export async function createPerson(data: {
   fullName: string;
+  work?: string | null;
   phone?: string | null;
   address?: string | null;
   notes?: string | null;
@@ -169,6 +307,7 @@ export async function createPerson(data: {
   const newId = randomUUID();
   const now = new Date();
   const trimmedName = data.fullName.trim();
+  const work = data.work?.trim() || null;
   const phone = data.phone?.trim() || null;
   const address = data.address?.trim() || null;
   const notes = data.notes?.trim() || null;
@@ -178,6 +317,7 @@ export async function createPerson(data: {
       await db.insert(people).values({
         id: newId,
         fullName: trimmedName,
+        work,
         phone,
         address,
         notes,
@@ -186,6 +326,7 @@ export async function createPerson(data: {
       return {
         id: newId,
         fullName: trimmedName,
+        work,
         phone,
         address,
         notes,
@@ -208,6 +349,7 @@ export async function updatePerson(
   id: string,
   data: {
     fullName: string;
+    work?: string | null;
     phone?: string | null;
     address?: string | null;
     notes?: string | null;
@@ -216,6 +358,7 @@ export async function updatePerson(
   assertDbConfigured();
   const now = new Date();
   const trimmedName = data.fullName.trim();
+  const work = data.work?.trim() || null;
   const phone = data.phone?.trim() || null;
   const address = data.address?.trim() || null;
   const notes = data.notes?.trim() || null;
@@ -224,14 +367,14 @@ export async function updatePerson(
     try {
       const [existingPerson] = await db.select().from(people).where(eq(people.id, id));
       if (!existingPerson) throw new Error('Person not found');
-
       await db
         .update(people)
         .set({
           fullName: trimmedName,
+          work,
           phone,
           address,
-          notes,
+          notes: data.notes === undefined ? existingPerson.notes : notes,
           updatedAt: now,
         })
         .where(eq(people.id, id));
@@ -239,6 +382,7 @@ export async function updatePerson(
       return {
         id,
         fullName: trimmedName,
+        work,
         phone,
         address,
         notes,

@@ -6,11 +6,13 @@ import { loanSchema } from '@/lib/validations/loan';
 import { rupeesToPaise } from '@/lib/utils/currency';
 import { installmentFrequencies, type InstallmentFrequency } from '@/lib/constants/installment';
 import { z } from 'zod';
+import { notifyLoanCreated } from '@/lib/services/notifications.service';
 
 export async function createLoanAction(data: {
   personId: string;
   loanAmount: number; // in rupees
   loanDate: string; // YYYY-MM-DD
+  durationDays?: number | null;
   dailyInstallment?: number | null; // in rupees
   installmentFrequency: InstallmentFrequency;
   notes?: string | null;
@@ -27,12 +29,20 @@ export async function createLoanAction(data: {
       personId: validated.personId,
       loanAmountPaise,
       loanDate: validated.loanDate,
+      durationDays: validated.durationDays,
       dailyInstallmentPaise,
       installmentFrequency: validated.installmentFrequency,
       notes: validated.notes,
     });
 
+    try {
+      await notifyLoanCreated(newLoan.id);
+    } catch (error) {
+      console.error('Loan was created, but its notification could not be saved:', error);
+    }
+
     revalidatePath('/dashboard');
+    revalidatePath('/notifications');
     revalidatePath('/people');
     revalidatePath(`/people/${validated.personId}`);
 
@@ -62,6 +72,7 @@ export async function updateLoanScheduleAction(data: {
   loanId: string;
   installmentAmount: number | null;
   installmentFrequency: InstallmentFrequency;
+  durationDays?: number | null;
 }) {
   try {
     const validated = z
@@ -69,6 +80,7 @@ export async function updateLoanScheduleAction(data: {
         loanId: z.string().uuid(),
         installmentAmount: z.number().positive().nullable(),
         installmentFrequency: z.enum(installmentFrequencies),
+        durationDays: z.number().int().positive().nullable().optional(),
       })
       .parse(data);
     const installmentPaise =
@@ -77,6 +89,7 @@ export async function updateLoanScheduleAction(data: {
       loanId: validated.loanId,
       installmentPaise,
       installmentFrequency: validated.installmentFrequency,
+      durationDays: validated.durationDays ?? null,
     });
     revalidatePath('/dashboard');
     revalidatePath('/people');

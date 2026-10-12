@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import {
   bigint,
   index,
+  int,
   mysqlTable,
   text,
   timestamp,
@@ -18,7 +19,9 @@ export const people = mysqlTable(
   {
     id: varchar('id', { length: 36 }).primaryKey(),
     fullName: varchar('full_name', { length: 255 }).notNull(),
+    tamilName: varchar('tamil_name', { length: 255 }),
     phone: varchar('phone', { length: 50 }),
+    work: varchar('work', { length: 255 }),
     address: text('address'),
     notes: text('notes'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -44,6 +47,8 @@ export const loans = mysqlTable(
       .references(() => people.id, { onDelete: 'cascade' }),
     loanAmount: bigint('loan_amount', { mode: 'number' }).notNull(),
     loanDate: varchar('loan_date', { length: 10 }).notNull(), // YYYY-MM-DD
+    durationDays: int('duration_days'),
+    expectedEndDate: varchar('expected_end_date', { length: 10 }),
     dailyInstallment: bigint('daily_installment', { mode: 'number' }),
     installmentFrequency: varchar('installment_frequency', { length: 10 })
       .$type<InstallmentFrequency>()
@@ -60,6 +65,30 @@ export const loans = mysqlTable(
     index('loans_person_id_idx').on(table.personId),
     index('loans_status_idx').on(table.status),
     index('loans_loan_date_idx').on(table.loanDate),
+    index('loans_expected_end_date_idx').on(table.expectedEndDate),
+  ]
+);
+
+export const notifications = mysqlTable(
+  'notifications',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    eventKey: varchar('event_key', { length: 191 }).notNull().unique(),
+    type: varchar('type', { length: 32 }).notNull(),
+    personId: varchar('person_id', { length: 36 }).references(() => people.id, {
+      onDelete: 'cascade',
+    }),
+    loanId: varchar('loan_id', { length: 36 }).references(() => loans.id, {
+      onDelete: 'cascade',
+    }),
+    title: varchar('title', { length: 255 }).notNull(),
+    message: text('message').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    readAt: timestamp('read_at'),
+  },
+  (table) => [
+    index('notifications_created_at_idx').on(table.createdAt),
+    index('notifications_read_at_idx').on(table.readAt),
   ]
 );
 
