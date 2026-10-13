@@ -44,6 +44,7 @@ export function BottomNav() {
         {/* Dashboard link */}
         <Link
           href="/dashboard"
+          prefetch={false}
           className={cn(
             'flex flex-col items-center justify-center flex-1 py-1 text-xs font-semibold transition-colors',
             navItems[0].isActive
@@ -61,6 +62,7 @@ export function BottomNav() {
         <div className="flex flex-col items-center justify-center px-2">
           <Link
             href="/collections/new"
+            prefetch={false}
             aria-label="Add Collection"
             className="flex h-13 w-13 -mt-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-4 ring-white active:scale-95 transition-all hover:bg-emerald-700"
           >
@@ -72,6 +74,7 @@ export function BottomNav() {
         {/* People link */}
         <Link
           href="/people"
+          prefetch={false}
           className={cn(
             'flex flex-col items-center justify-center flex-1 py-1 text-xs font-semibold transition-colors',
             navItems[1].isActive
@@ -88,6 +91,7 @@ export function BottomNav() {
         {/* History link */}
         <Link
           href="/history"
+          prefetch={false}
           className={cn(
             'flex flex-col items-center justify-center flex-1 py-1 text-xs font-semibold transition-colors',
             navItems[2].isActive
@@ -103,6 +107,7 @@ export function BottomNav() {
 
         <Link
           href="/notifications"
+          prefetch={false}
           className={cn(
             'flex flex-col items-center justify-center flex-1 py-1 text-xs font-semibold transition-colors',
             navItems[3].isActive

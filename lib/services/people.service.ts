@@ -119,6 +119,21 @@ export async function getPeopleList(searchQuery?: string): Promise<PersonWithFin
   throw new Error('DATABASE_URL is not configured.');
 }
 
+export async function getPeopleOptions(): Promise<{ id: string; fullName: string }[]> {
+  assertDbConfigured();
+  await ensureDbInitialized();
+
+  try {
+    return await db
+      .select({ id: people.id, fullName: people.fullName })
+      .from(people)
+      .orderBy(asc(people.fullName), asc(people.id));
+  } catch (err) {
+    console.error('Database query failed in getPeopleOptions:', err);
+    throw err;
+  }
+}
+
 export async function getPeopleListPage(
   searchQuery: string | undefined,
   page: number,

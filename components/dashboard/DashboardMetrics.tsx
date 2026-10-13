@@ -35,6 +35,7 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
             <Link
               key={loan.loanId}
               href={`/loans/${loan.loanId}`}
+              prefetch={false}
               className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white/80 px-2.5 py-2 text-left"
             >
               <span className="truncate text-xs font-bold text-slate-800">
@@ -90,7 +91,7 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
       </div>
 
       {/* Quick Add Collection Action */}
-      <Link href="/collections/new" className="block">
+      <Link href="/collections/new" prefetch={false} className="block">
         <Button
           size="lg"
           className="w-full bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm flex items-center justify-center gap-2 h-12"
@@ -119,6 +120,7 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
                 <Link
                   key={investment.id}
                   href={`/loans/${investment.id}`}
+                  prefetch={false}
                   className="flex items-center justify-between gap-2 text-xs text-slate-700"
                 >
                   <span className="truncate">{investment.personName}</span>
@@ -156,6 +158,7 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
             </div>
             <Link
               href="/notifications"
+              prefetch={false}
               className="mt-3 block text-right text-xs font-bold text-emerald-800 hover:text-emerald-900"
             >
               View all alerts

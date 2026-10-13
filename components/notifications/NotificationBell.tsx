@@ -36,6 +36,7 @@ export function NotificationBell() {
   return (
     <Link
       href="/notifications"
+      prefetch={false}
       aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
       className="relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100"
     >

@@ -3,7 +3,7 @@ import {
   getFinancialActivityHistory,
   type HistoryFilterRange,
 } from '@/lib/services/collections.service';
-import { getPeopleList } from '@/lib/services/people.service';
+import { getPeopleOptions } from '@/lib/services/people.service';
 import { HistoryView } from '@/components/history/HistoryView';
 import { Header } from '@/components/shared/Header';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -37,13 +37,8 @@ async function HistoryData({ searchParams }: HistoryPageProps) {
       page: currentPage,
       pageSize: 25,
     }),
-    getPeopleList(),
+    getPeopleOptions(),
   ]);
-
-  const peopleChoices = people.map((p) => ({
-    id: p.id,
-    fullName: p.fullName,
-  }));
 
   return (
     <div className="p-4">
@@ -56,7 +51,7 @@ async function HistoryData({ searchParams }: HistoryPageProps) {
         totalCount={historyResult.count}
         currentPage={historyResult.page}
         pageSize={historyResult.pageSize}
-        peopleList={peopleChoices}
+        peopleList={people}
         currentRange={range}
         currentPersonId={personId}
         currentStartDate={startDate}

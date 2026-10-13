@@ -114,6 +114,7 @@ export function NotificationsView({
               {item.loanId && (
                 <Link
                   href={`/loans/${item.loanId}`}
+                  prefetch={false}
                   className="mt-2 inline-block text-xs font-bold text-emerald-800 hover:underline"
                 >
                   View loan
@@ -146,6 +147,7 @@ export function NotificationsView({
           </p>
           <div className="flex gap-2">
             <Link
+              prefetch={false}
               aria-disabled={currentPage <= 1}
               tabIndex={currentPage <= 1 ? -1 : undefined}
               href={currentPage > 1 ? `/notifications?page=${currentPage - 1}` : '/notifications'}
@@ -158,6 +160,7 @@ export function NotificationsView({
               Previous
             </Link>
             <Link
+              prefetch={false}
               aria-disabled={currentPage >= totalPages}
               tabIndex={currentPage >= totalPages ? -1 : undefined}
               href={`/notifications?page=${Math.min(currentPage + 1, totalPages)}`}

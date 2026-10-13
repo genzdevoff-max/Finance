@@ -53,15 +53,6 @@ export async function getPeopleWithActiveLoansForCollection(): Promise<
   assertDbConfigured();
   if (isDbConfigured()) {
     try {
-      const collectionTotals = db
-        .select({
-          loanId: collections.loanId,
-          totalCollected: sql<string>`SUM(${collections.amount})`.as('total_collected'),
-        })
-        .from(collections)
-        .groupBy(collections.loanId)
-        .as('collection_totals');
-
       const rows = await db
         .select({
           personId: people.id,
@@ -72,12 +63,22 @@ export async function getPeopleWithActiveLoansForCollection(): Promise<
           loanDate: loans.loanDate,
           dailyInstallment: loans.dailyInstallment,
           installmentFrequency: loans.installmentFrequency,
-          totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
+          totalCollected: sql<string>`COALESCE(SUM(${collections.amount}), 0)`,
         })
         .from(loans)
         .innerJoin(people, eq(people.id, loans.personId))
-        .leftJoin(collectionTotals, eq(collectionTotals.loanId, loans.id))
+        .leftJoin(collections, eq(collections.loanId, loans.id))
         .where(eq(loans.status, 'ACTIVE'))
+        .groupBy(
+          loans.id,
+          people.id,
+          people.fullName,
+          people.phone,
+          loans.loanAmount,
+          loans.loanDate,
+          loans.dailyInstallment,
+          loans.installmentFrequency
+        )
         .orderBy(people.fullName, desc(loans.loanDate));
 
       const peopleById = new Map<string, PersonWithActiveLoansForCollection>();

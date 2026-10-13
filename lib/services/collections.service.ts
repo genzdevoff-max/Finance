@@ -522,14 +522,7 @@ export async function getFinancialActivityHistory(options: HistoryQueryOptions =
 
       const page = Math.max(1, Math.floor(options.page ?? 1));
       const pageSize = Math.min(25, Math.max(1, Math.floor(options.pageSize ?? 25)));
-      const activityRows = db.$with('history_activity').as(
-        investmentRows.unionAll(collectionRows)
-      );
-      const rowsQuery = db
-        .with(activityRows)
-        .select()
-        .from(activityRows)
-        .orderBy(desc(activityRows.activityAt), desc(activityRows.id));
+      const rowsToRead = page * pageSize;
       const collectionSummaryQuery = db
         .select({
           totalCollected: sql<string>`COALESCE(SUM(${collections.amount}), 0)`,
@@ -547,8 +540,14 @@ export async function getFinancialActivityHistory(options: HistoryQueryOptions =
         .from(loans)
         .innerJoin(people, eq(people.id, loans.personId))
         .where(investmentConditions.length > 0 ? and(...investmentConditions) : undefined);
-      const [rows, [collectionSummary], [investmentSummary]] = await Promise.all([
-        rowsQuery.limit(pageSize).offset((page - 1) * pageSize),
+      const [investmentRowsPage, collectionRowsPage, [collectionSummary], [investmentSummary]] =
+        await Promise.all([
+        investmentRows
+          .orderBy(desc(loans.loanDate), desc(loans.id))
+          .limit(rowsToRead),
+        collectionRows
+          .orderBy(desc(collections.collectedAt), desc(collections.id))
+          .limit(rowsToRead),
         collectionSummaryQuery,
         investmentSummaryQuery,
       ]);
@@ -557,20 +556,42 @@ export async function getFinancialActivityHistory(options: HistoryQueryOptions =
       const totalInvested = Number(investmentSummary?.totalInvested ?? 0);
       const investmentCount = Number(investmentSummary?.count ?? 0);
 
-      const items: HistoryActivity[] = rows.map((row) => ({
-        id: row.id,
-        type: row.type as HistoryActivityType,
-        loanId: row.loanId,
-        personId: row.personId,
-        amount: Number(row.amount),
-        activityAt: new Date(row.activityAt),
-        notes: row.notes,
-        createdAt: new Date(row.createdAt),
-        personName: row.personName,
-        personPhone: row.personPhone,
-        loanAmount: Number(row.loanAmount),
-        loanDate: row.loanDate,
-      }));
+      const items: HistoryActivity[] = [
+        ...investmentRowsPage.map((row) => ({
+          id: row.id,
+          type: 'investment' as const,
+          loanId: row.loanId,
+          personId: row.personId,
+          amount: Number(row.amount),
+          activityAt: new Date(row.activityAt),
+          notes: row.notes,
+          createdAt: new Date(row.createdAt),
+          personName: row.personName,
+          personPhone: row.personPhone,
+          loanAmount: Number(row.loanAmount),
+          loanDate: row.loanDate,
+        })),
+        ...collectionRowsPage.map((row) => ({
+          id: row.id,
+          type: 'collection' as const,
+          loanId: row.loanId,
+          personId: row.personId,
+          amount: Number(row.amount),
+          activityAt: new Date(row.activityAt),
+          notes: row.notes,
+          createdAt: new Date(row.createdAt),
+          personName: row.personName,
+          personPhone: row.personPhone,
+          loanAmount: Number(row.loanAmount),
+          loanDate: row.loanDate,
+        })),
+      ]
+        .sort(
+          (a, b) =>
+            b.activityAt.getTime() - a.activityAt.getTime() ||
+            b.id.localeCompare(a.id)
+        )
+        .slice((page - 1) * pageSize, rowsToRead);
 
       return {
         totalCollected,

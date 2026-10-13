@@ -377,6 +377,7 @@ export function HistoryView({
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/people/${item.personId}`}
+                  prefetch={false}
                   className="font-bold text-slate-900 hover:text-emerald-700 transition-colors block truncate text-sm"
                 >
                   {item.personName}
@@ -421,6 +422,7 @@ export function HistoryView({
                   </div>
                   <Link
                     href={`/loans/${item.loanId}`}
+                    prefetch={false}
                     className="text-[10px] font-semibold text-slate-400 hover:text-slate-600"
                   >
                     View Loan
@@ -431,6 +433,7 @@ export function HistoryView({
                   <div className="flex items-center gap-0.5 pl-1 border-l border-slate-100">
                     <Link
                       href={`/collections/${item.id}/edit`}
+                      prefetch={false}
                       aria-label="Edit collection"
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                     >

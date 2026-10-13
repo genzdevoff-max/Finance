@@ -24,6 +24,7 @@ export function OutstandingPeopleList({ people }: OutstandingPeopleListProps) {
         </h2>
         <Link
           href="/people"
+          prefetch={false}
           className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
         >
           View All
@@ -44,6 +45,7 @@ export function OutstandingPeopleList({ people }: OutstandingPeopleListProps) {
             <Link
               key={person.id}
               href={`/people/${person.id}`}
+              prefetch={false}
               className="block active:scale-[0.99] transition-transform"
             >
               <Card className="p-3.5 hover:border-slate-300 transition-colors flex items-center justify-between gap-3 bg-white">

@@ -50,6 +50,7 @@ export async function getNotifications(limit = 100, offset = 0) {
 
   const today = getTodayDateString();
   const alertWindowEnd = addDaysToDateString(today, LOAN_EXPIRY_ALERT_DAYS) || today;
+  const remainingAmount = sql<number>`GREATEST(0, ${loans.loanAmount} - COALESCE(SUM(${collections.amount}), 0))`;
   const dueLoans = await db
     .select({
       loanId: loans.id,
@@ -57,17 +58,25 @@ export async function getNotifications(limit = 100, offset = 0) {
       personName: people.fullName,
       loanAmount: loans.loanAmount,
       expectedEndDate: loans.expectedEndDate,
-      remainingAmount: sql<number>`GREATEST(0, ${loans.loanAmount} - COALESCE((SELECT SUM(${collections.amount}) FROM ${collections} WHERE ${collections.loanId} = ${loans.id}), 0))`,
+      remainingAmount,
     })
     .from(loans)
     .innerJoin(people, eq(people.id, loans.personId))
+    .leftJoin(collections, eq(collections.loanId, loans.id))
     .where(
       and(
         eq(loans.status, 'ACTIVE'),
-        lte(loans.expectedEndDate, alertWindowEnd),
-        sql`(${loans.loanAmount} - COALESCE((SELECT SUM(${collections.amount}) FROM ${collections} WHERE ${collections.loanId} = ${loans.id}), 0)) > 0`
+        lte(loans.expectedEndDate, alertWindowEnd)
       )
     )
+    .groupBy(
+      loans.id,
+      people.id,
+      people.fullName,
+      loans.loanAmount,
+      loans.expectedEndDate
+    )
+    .having(sql`${remainingAmount} > 0`)
     .orderBy(asc(loans.expectedEndDate));
 
   const dueNotifications = dueLoans.map((loan) => {
@@ -122,15 +131,6 @@ export async function getNotifications(limit = 100, offset = 0) {
     .orderBy(desc(notifications.createdAt), desc(notifications.id))
     .limit(limit)
     .offset(offset);
-}
-
-export async function getUnreadNotificationCount() {
-  await getNotifications();
-  const [result] = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(notifications)
-    .where(sql`${notifications.readAt} IS NULL`);
-  return Number(result?.count ?? 0);
 }
 
 export async function getNotificationCount() {

@@ -93,6 +93,7 @@ export function CollectionsPeriodTabs({ today, week, month }: CollectionsPeriodT
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/people/${item.personId}`}
+                    prefetch={false}
                     className="block truncate text-sm font-bold text-slate-900 transition-colors hover:text-emerald-700"
                   >
                     {formatPersonDisplayName(item.personName, item.personTamilName)}
@@ -116,6 +117,7 @@ export function CollectionsPeriodTabs({ today, week, month }: CollectionsPeriodT
                   </div>
                   <Link
                     href={`/loans/${item.loanId}`}
+                    prefetch={false}
                     className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-slate-400 transition-colors hover:text-slate-700"
                   >
                     Loan Details <ArrowRight className="h-3 w-3" />
