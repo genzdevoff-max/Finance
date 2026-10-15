@@ -1,4 +1,4 @@
-import { getPeopleList } from '@/lib/services/people.service';
+import { getPersonOptionById } from '@/lib/services/people.service';
 import { LoanForm } from '@/components/loans/LoanForm';
 import { Header } from '@/components/shared/Header';
 
@@ -12,12 +12,7 @@ interface NewLoanPageProps {
 
 export default async function NewLoanPage({ searchParams }: NewLoanPageProps) {
   const { personId } = await searchParams;
-  const people = await getPeopleList();
-
-  const borrowerChoices = people.map((p) => ({
-    id: p.id,
-    fullName: p.fullName,
-  }));
+  const defaultPerson = personId ? await getPersonOptionById(personId) : null;
 
   const backUrl = personId ? `/people/${personId}` : '/people';
 
@@ -29,10 +24,9 @@ export default async function NewLoanPage({ searchParams }: NewLoanPageProps) {
         backHref={backUrl}
       />
 
-      <div className="p-4">
+      <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
         <LoanForm
-          people={borrowerChoices}
-          defaultPersonId={personId}
+          defaultPerson={defaultPerson ?? undefined}
         />
       </div>
     </div>

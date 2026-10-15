@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { and, asc, desc, eq, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lte, sql } from 'drizzle-orm';
 import { db, collections, loans, notifications, people, ensureDbInitialized, assertDbConfigured } from '@/lib/db';
 import { formatRupees } from '@/lib/utils/currency';
 import {
@@ -50,7 +50,9 @@ export async function getNotifications(limit = 100, offset = 0) {
 
   const today = getTodayDateString();
   const alertWindowEnd = addDaysToDateString(today, LOAN_EXPIRY_ALERT_DAYS) || today;
-  const remainingAmount = sql<number>`GREATEST(0, ${loans.loanAmount} - COALESCE(SUM(${collections.amount}), 0))`;
+  const remainingAmount = sql<number>`
+    GREATEST(0, ${loans.loanAmount} - COALESCE(SUM(${collections.amount}), 0))
+  `;
   const dueLoans = await db
     .select({
       loanId: loans.id,
@@ -76,8 +78,8 @@ export async function getNotifications(limit = 100, offset = 0) {
       loans.loanAmount,
       loans.expectedEndDate
     )
-    .having(sql`${remainingAmount} > 0`)
-    .orderBy(asc(loans.expectedEndDate));
+    .having(gt(remainingAmount, 0))
+    .orderBy(asc(loans.expectedEndDate), asc(loans.id));
 
   const dueNotifications = dueLoans.map((loan) => {
     const dueDate = loan.expectedEndDate || today;

@@ -21,11 +21,14 @@ import {
   Calendar,
   IndianRupee,
   Download,
+  X,
+  Loader2,
 } from 'lucide-react';
 import type {
   HistoryActivity,
   HistoryFilterRange,
 } from '@/lib/services/collections.service';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 
 interface HistoryViewProps {
   initialItems: HistoryActivity[];
@@ -36,7 +39,7 @@ interface HistoryViewProps {
   totalCount: number;
   currentPage: number;
   pageSize: number;
-  peopleList: { id: string; fullName: string }[];
+  initialPerson: { id: string; fullName: string } | null;
   currentRange: HistoryFilterRange;
   currentPersonId?: string;
   currentStartDate?: string;
@@ -53,7 +56,7 @@ export function HistoryView({
   totalCount,
   currentPage,
   pageSize,
-  peopleList,
+  initialPerson,
   currentRange,
   currentPersonId,
   currentStartDate,
@@ -64,6 +67,13 @@ export function HistoryView({
 
   const [selectedRange, setSelectedRange] = React.useState<HistoryFilterRange>(currentRange);
   const [selectedPerson, setSelectedPerson] = React.useState<string>(currentPersonId || 'all');
+  const [personSearch, setPersonSearch] = React.useState(initialPerson?.fullName ?? '');
+  const [selectedPersonName, setSelectedPersonName] = React.useState(initialPerson?.fullName ?? '');
+  const [personResults, setPersonResults] = React.useState<
+    { id: string; fullName: string; phone: string | null }[]
+  >([]);
+  const [isSearchingPeople, setIsSearchingPeople] = React.useState(false);
+  const [personSearchError, setPersonSearchError] = React.useState<string | null>(null);
   const [customStart, setCustomStart] = React.useState<string>(currentStartDate || '');
   const [customEnd, setCustomEnd] = React.useState<string>(currentEndDate || '');
   const [searchTerm, setSearchTerm] = React.useState(currentSearch || '');
@@ -90,6 +100,7 @@ export function HistoryView({
       if (end) params.set('endDate', end);
     }
     if (page > 1) params.set('page', String(page));
+    startNavigationProgress();
     router.push(`/history?${params.toString()}`);
   }, [router, searchTerm]);
 
@@ -104,6 +115,44 @@ export function HistoryView({
     setSelectedPerson(personId);
     applyFilters(selectedRange, personId, customStart, customEnd);
   };
+
+  React.useEffect(() => {
+    const query = personSearch.trim();
+    if (query.length < 2 || query.toLocaleLowerCase() === selectedPersonName.toLocaleLowerCase()) {
+      setPersonResults([]);
+      setPersonSearchError(null);
+      setIsSearchingPeople(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setIsSearchingPeople(true);
+      setPersonSearchError(null);
+      try {
+        const response = await fetch(`/api/people/search?q=${encodeURIComponent(query)}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('Unable to search people.');
+        const data: {
+          people: { id: string; fullName: string; phone: string | null }[];
+        } = await response.json();
+        setPersonResults(data.people);
+      } catch (searchError) {
+        if (searchError instanceof Error && searchError.name === 'AbortError') return;
+        console.error('History person search failed:', searchError);
+        setPersonSearchError('Search failed. Please try again.');
+      } finally {
+        if (!controller.signal.aborted) setIsSearchingPeople(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [personSearch, selectedPersonName]);
 
   const handleCustomDateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,21 +329,65 @@ export function HistoryView({
           </form>
         )}
 
-        {/* Borrower Filter Dropdown */}
-        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-          <Filter className="h-4 w-4 text-slate-400 shrink-0" />
-          <select
-            value={selectedPerson}
-            onChange={(e) => handlePersonChange(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          >
-            <option value="all">All People ({peopleList.length})</option>
-            {peopleList.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.fullName}
-              </option>
-            ))}
-          </select>
+        {/* Borrower filter searches on demand to avoid loading every person into the page. */}
+        <div className="relative flex items-center gap-2 border-t border-slate-100 pt-2">
+          <Filter className="h-4 w-4 shrink-0 text-slate-400" />
+          <div className="relative flex-1">
+            <Input
+              type="search"
+              value={personSearch}
+              autoComplete="off"
+              placeholder={selectedPerson === 'all' ? 'All people — search by name or phone' : 'Search another person'}
+              aria-label="Filter history by person"
+              onChange={(event) => {
+                setPersonSearch(event.target.value);
+                setPersonResults([]);
+                setPersonSearchError(null);
+              }}
+              className="h-10 pr-10 text-xs"
+            />
+            {(selectedPerson !== 'all' || personSearch) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPersonSearch('');
+                  setSelectedPersonName('');
+                  setPersonResults([]);
+                  handlePersonChange('all');
+                }}
+                aria-label="Show all people"
+                className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {personResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                {personResults.map((person) => (
+                  <button
+                    key={person.id}
+                    type="button"
+                    onClick={() => {
+                      setPersonSearch(person.fullName);
+                      setSelectedPersonName(person.fullName);
+                      setPersonResults([]);
+                      handlePersonChange(person.id);
+                    }}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-emerald-50"
+                  >
+                    <span className="truncate text-sm font-semibold text-slate-800">{person.fullName}</span>
+                    {person.phone && <span className="shrink-0 text-xs text-slate-500">{person.phone}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {(isSearchingPeople || personSearchError || (personSearch.trim().length >= 2 && personResults.length === 0 && !isSearchingPeople)) && (
+              <p role={personSearchError ? 'alert' : 'status'} className="mt-1 text-xs text-slate-500">
+                {isSearchingPeople && <Loader2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 animate-spin align-[-2px]" />}
+                {personSearchError || (isSearchingPeople ? 'Searching...' : 'No matching people found.')}
+              </p>
+            )}
+          </div>
         </div>
         <a
           href={customRangeInvalid ? undefined : exportHref}

@@ -17,6 +17,9 @@ interface PaymentHistoryListProps {
   loanId: string;
   personId: string;
   collections: CollectionWithBalance[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
   isLoanActive: boolean;
 }
 
@@ -24,6 +27,9 @@ export function PaymentHistoryList({
   loanId,
   personId,
   collections,
+  totalCount,
+  currentPage,
+  totalPages,
   isLoanActive,
 }: PaymentHistoryListProps) {
   const router = useRouter();
@@ -62,7 +68,7 @@ export function PaymentHistoryList({
           Payment History
         </h2>
         <span className="text-xs font-semibold text-slate-500">
-          {collections.length} {collections.length === 1 ? 'record' : 'records'}
+          {totalCount} {totalCount === 1 ? 'record' : 'records'}
         </span>
       </div>
 
@@ -135,6 +141,40 @@ export function PaymentHistoryList({
               </div>
             </Card>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <p className="text-xs text-slate-500">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Link
+              href={currentPage > 1 ? `/loans/${loanId}?page=${currentPage - 1}` : `/loans/${loanId}`}
+              aria-disabled={currentPage <= 1}
+              tabIndex={currentPage <= 1 ? -1 : undefined}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                currentPage <= 1
+                  ? 'pointer-events-none border-slate-200 text-slate-400'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Previous
+            </Link>
+            <Link
+              href={`/loans/${loanId}?page=${Math.min(currentPage + 1, totalPages)}`}
+              aria-disabled={currentPage >= totalPages}
+              tabIndex={currentPage >= totalPages ? -1 : undefined}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                currentPage >= totalPages
+                  ? 'pointer-events-none border-slate-200 text-slate-400'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Next
+            </Link>
+          </div>
         </div>
       )}
 

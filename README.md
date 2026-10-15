@@ -1,6 +1,6 @@
 # Finance Tracker
 
-A simple, mobile-first personal finance, credit, and collection management application. Built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Drizzle ORM**, and **TiDB Cloud MySQL**.
+A responsive personal finance, credit, and collection management web application. Built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Drizzle ORM**, and **TiDB Cloud MySQL**.
 
 Designed to track financial accounts, multiple separate credit/loan records per person, installment repayments, and running balances without manual math or accounting complexity.
 
@@ -8,7 +8,8 @@ Designed to track financial accounts, multiple separate credit/loan records per 
 
 ## 📱 Key Features
 
-- **Mobile-First App Experience**: Optimized for mobile screens, installs cleanly on Android & iOS as a standalone PWA with an app icon.
+- **Responsive Web & Mobile Experience**: Works in modern desktop and mobile browsers, keeps the emerald/slate theme across screen sizes, and installs on Android and iOS as a standalone PWA.
+- **Adaptive Navigation**: Desktop uses a persistent sidebar; tablet and mobile use compact bottom navigation.
 - **Single-User, Zero-Friction**: No login or authentication walls for v1. Open the app and record collections immediately.
 - **High-Speed Collection Flow**:
   - Open app &rarr; Tap "+ Collect" &rarr; Select Borrower &rarr; Select Loan &rarr; Enter Amount &rarr; Confirm &rarr; Done.
@@ -31,6 +32,7 @@ Designed to track financial accounts, multiple separate credit/loan records per 
 - **Full History & Filtering**:
   - Filter payments by Today, Yesterday, This Week, This Month, All Time, or Custom Date Range.
   - Filter by individual borrower.
+  - History, people, and notification records are loaded in pages; borrower selectors search on demand rather than rendering the whole customer list.
   - Edit or delete payment entries with automatic balance recalculation.
 - **Excel Export**: Download a person’s loan summary and full collection history as an `.xlsx` workbook.
 - **History Reports**: Download all history, an individual customer’s history, or a date-filtered collection report as a three-sheet Excel workbook.
@@ -200,3 +202,9 @@ The code separates database queries (`lib/db/`), validation (`lib/validations/`)
 - Cloud backup & CSV / Excel export
 - WhatsApp payment receipts / reminders
 - PDF statement generation
+
+### Data volume and performance
+
+The people, history, alert, loan payment-history, and per-person loan screens use server-side pagination, and loan/collection forms search borrowers on demand with bounded search results. Dashboard lists, per-person loan lists, and alert examples are bounded while totals and due-loan counts are calculated in the database. The database schema indexes the main person, loan, collection, and notification lookup paths.
+
+These measures avoid sending or rendering every record at once, but do not guarantee a particular response time at 10,000 records. Actual performance depends on database size, network latency, query plans, and the number of loans and collections per person. The current local dataset is too small to verify 10,000-record performance; test with production-like data and monitor slow queries as data grows. Aggregate-heavy queries or people with exceptionally many related records may eventually need further indexing, caching, or precomputed summaries.

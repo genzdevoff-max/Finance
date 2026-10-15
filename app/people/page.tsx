@@ -24,7 +24,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
         subtitle={`${result.totalCount} ${result.totalCount === 1 ? 'person' : 'people'} registered`}
       />
 
-      <div className="p-4">
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
         <PeopleList
           initialPeople={result.items}
           totalCount={result.totalCount}

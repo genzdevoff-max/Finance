@@ -1,4 +1,4 @@
-import { getPeopleListPage } from '@/lib/services/people.service';
+import { searchPeopleOptions } from '@/lib/services/people.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,10 +7,10 @@ export async function GET(request: Request) {
   if (query.length < 2) return Response.json({ people: [] });
 
   try {
-    const result = await getPeopleListPage(query, 1, 10);
+    const people = await searchPeopleOptions(query);
     return Response.json(
       {
-        people: result.items.map(({ id, fullName, phone }) => ({ id, fullName, phone })),
+        people,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );

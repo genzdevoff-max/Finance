@@ -3,7 +3,7 @@ import {
   getFinancialActivityHistory,
   type HistoryFilterRange,
 } from '@/lib/services/collections.service';
-import { getPeopleOptions } from '@/lib/services/people.service';
+import { getPersonOptionById } from '@/lib/services/people.service';
 import { HistoryView } from '@/components/history/HistoryView';
 import { Header } from '@/components/shared/Header';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -27,7 +27,7 @@ async function HistoryData({ searchParams }: HistoryPageProps) {
   const currentPage =
     Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  const [historyResult, people] = await Promise.all([
+  const [historyResult, selectedPerson] = await Promise.all([
     getFinancialActivityHistory({
       range,
       personId,
@@ -37,11 +37,11 @@ async function HistoryData({ searchParams }: HistoryPageProps) {
       page: currentPage,
       pageSize: 25,
     }),
-    getPeopleOptions(),
+    personId ? getPersonOptionById(personId) : Promise.resolve(null),
   ]);
 
   return (
-    <div className="p-4">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <HistoryView
         initialItems={historyResult.items}
         totalCollected={historyResult.totalCollected}
@@ -51,7 +51,7 @@ async function HistoryData({ searchParams }: HistoryPageProps) {
         totalCount={historyResult.count}
         currentPage={historyResult.page}
         pageSize={historyResult.pageSize}
-        peopleList={people}
+        initialPerson={selectedPerson}
         currentRange={range}
         currentPersonId={personId}
         currentStartDate={startDate}

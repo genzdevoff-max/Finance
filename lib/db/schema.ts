@@ -29,6 +29,7 @@ export const people = mysqlTable(
   },
   (table) => [
     index('people_full_name_idx').on(table.fullName),
+    index('people_full_name_id_idx').on(table.fullName, table.id),
     index('people_phone_idx').on(table.phone),
   ]
 );
@@ -63,8 +64,10 @@ export const loans = mysqlTable(
   },
   (table) => [
     index('loans_person_id_idx').on(table.personId),
+    index('loans_person_loan_date_id_idx').on(table.personId, table.loanDate, table.id),
     index('loans_status_idx').on(table.status),
     index('loans_loan_date_idx').on(table.loanDate),
+    index('loans_loan_date_id_idx').on(table.loanDate, table.id),
     index('loans_expected_end_date_idx').on(table.expectedEndDate),
   ]
 );
@@ -88,6 +91,7 @@ export const notifications = mysqlTable(
   },
   (table) => [
     index('notifications_created_at_idx').on(table.createdAt),
+    index('notifications_created_at_id_idx').on(table.createdAt, table.id),
     index('notifications_read_at_idx').on(table.readAt),
   ]
 );
@@ -117,6 +121,7 @@ export const collections = mysqlTable(
     index('collections_loan_id_idx').on(table.loanId),
     index('collections_person_id_idx').on(table.personId),
     index('collections_collected_at_idx').on(table.collectedAt),
+    index('collections_collected_at_id_idx').on(table.collectedAt, table.id),
   ]
 );
 

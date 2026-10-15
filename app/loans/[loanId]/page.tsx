@@ -10,11 +10,15 @@ interface LoanDetailPageProps {
   params: Promise<{
     loanId: string;
   }>;
+  searchParams: Promise<{ page?: string }>;
 }
 
-export default async function LoanDetailPage({ params }: LoanDetailPageProps) {
-  const { loanId } = await params;
-  const loan = await getLoanById(loanId);
+export default async function LoanDetailPage({ params, searchParams }: LoanDetailPageProps) {
+  const [{ loanId }, query] = await Promise.all([params, searchParams]);
+  const requestedPage = Number(query.page);
+  const page =
+    Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const loan = await getLoanById(loanId, page);
 
   if (!loan) {
     notFound();
@@ -28,7 +32,7 @@ export default async function LoanDetailPage({ params }: LoanDetailPageProps) {
         backHref={`/people/${loan.personId}`}
       />
 
-      <div className="p-4">
+      <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
         <LoanDetailsView loan={loan} />
       </div>
     </div>

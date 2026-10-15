@@ -7,12 +7,16 @@ import { PaymentHistoryList } from './PaymentHistoryList';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { deleteLoanAction } from '@/app/actions/loans.actions';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 import { Trash2 } from 'lucide-react';
 import type { LoanWithFinancials, CollectionWithBalance } from '@/lib/services/loans.service';
 
 interface LoanDetailsViewProps {
   loan: LoanWithFinancials & {
     collections: CollectionWithBalance[];
+    collectionPage: number;
+    collectionPageSize: number;
+    collectionTotalPages: number;
   };
 }
 
@@ -34,6 +38,7 @@ export function LoanDetailsView({ loan }: LoanDetailsViewProps) {
       return;
     }
 
+    startNavigationProgress();
     router.push(`/people/${loan.personId}`);
   };
 
@@ -53,6 +58,9 @@ export function LoanDetailsView({ loan }: LoanDetailsViewProps) {
         loanId={loan.id}
         personId={loan.personId}
         collections={loan.collections}
+        totalCount={loan.collectionCount}
+        currentPage={loan.collectionPage}
+        totalPages={loan.collectionTotalPages}
         isLoanActive={loan.status === 'ACTIVE'}
       />
 

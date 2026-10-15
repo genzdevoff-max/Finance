@@ -66,6 +66,14 @@ export async function ensureTablesExist(pool: mysql.Pool): Promise<void> {
     if (!loanIndexes.some((index) => index.Key_name === 'loans_expected_end_date_idx')) {
       await pool.query('CREATE INDEX loans_expected_end_date_idx ON loans (expected_end_date)');
     }
+    if (!loanIndexes.some((index) => index.Key_name === 'loans_person_loan_date_id_idx')) {
+      await pool.query(
+        'CREATE INDEX loans_person_loan_date_id_idx ON loans (person_id, loan_date, id)'
+      );
+    }
+    if (!loanIndexes.some((index) => index.Key_name === 'loans_loan_date_id_idx')) {
+      await pool.query('CREATE INDEX loans_loan_date_id_idx ON loans (loan_date, id)');
+    }
 
     // 3. collections table
     await pool.query(`
@@ -103,6 +111,27 @@ export async function ensureTablesExist(pool: mysql.Pool): Promise<void> {
         CONSTRAINT fk_notifications_loan FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE CASCADE
       );
     `);
+
+    const [peopleIndexes] = await pool.query<mysql.RowDataPacket[]>('SHOW INDEX FROM people');
+    if (!peopleIndexes.some((index) => index.Key_name === 'people_full_name_id_idx')) {
+      await pool.query('CREATE INDEX people_full_name_id_idx ON people (full_name, id)');
+    }
+
+    const [collectionIndexes] = await pool.query<mysql.RowDataPacket[]>('SHOW INDEX FROM collections');
+    if (!collectionIndexes.some((index) => index.Key_name === 'collections_collected_at_id_idx')) {
+      await pool.query(
+        'CREATE INDEX collections_collected_at_id_idx ON collections (collected_at, id)'
+      );
+    }
+
+    const [notificationIndexes] = await pool.query<mysql.RowDataPacket[]>(
+      'SHOW INDEX FROM notifications'
+    );
+    if (!notificationIndexes.some((index) => index.Key_name === 'notifications_created_at_id_idx')) {
+      await pool.query(
+        'CREATE INDEX notifications_created_at_id_idx ON notifications (created_at, id)'
+      );
+    }
   } catch (err) {
     console.error('Could not initialize database tables:', err);
     throw err;

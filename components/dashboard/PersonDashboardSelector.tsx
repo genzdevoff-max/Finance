@@ -2,9 +2,10 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, UserRound, X } from 'lucide-react';
+import { Loader2, Search, UserRound, X } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 
 interface PersonOption {
   id: string;
@@ -75,6 +76,7 @@ export function PersonDashboardSelector({
     setSearch(person.fullName);
     setResults([]);
     setIsOpen(false);
+    startNavigationProgress();
     router.push(`/dashboard?personId=${encodeURIComponent(person.id)}`);
   };
 
@@ -82,6 +84,7 @@ export function PersonDashboardSelector({
     setSearch('');
     setResults([]);
     setIsOpen(false);
+    startNavigationProgress();
     router.push('/dashboard');
   };
 
@@ -111,7 +114,14 @@ export function PersonDashboardSelector({
             }
           }}
         />
-        {(selectedPerson || search) && (
+        {isSearching ? (
+          <span
+            aria-label="Searching people"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-emerald-700"
+          >
+            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+          </span>
+        ) : (selectedPerson || search) && (
           <button
             type="button"
             onClick={clearSelection}
@@ -142,7 +152,8 @@ export function PersonDashboardSelector({
         )}
       </div>
       {(isSearching || error) && (
-        <p role={error ? 'alert' : 'status'} className={`text-xs ${error ? 'text-rose-700' : 'text-slate-500'}`}>
+        <p role={error ? 'alert' : 'status'} className={`flex items-center gap-1.5 text-xs ${error ? 'text-rose-700' : 'text-slate-500'}`}>
+          {isSearching && <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />}
           {error || 'Searching...'}
         </p>
       )}

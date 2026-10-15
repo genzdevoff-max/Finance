@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { personSchema, type PersonFormData } from '@/lib/validations/person';
 import { createPersonAction, updatePersonAction } from '@/app/actions/people.actions';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
@@ -51,6 +52,7 @@ export function PersonForm({ personId, initialData }: PersonFormProps) {
           setIsSubmitting(false);
           return;
         }
+        startNavigationProgress();
         router.push(`/people/${personId}`);
       } else {
         const res = await createPersonAction(data);
@@ -59,6 +61,7 @@ export function PersonForm({ personId, initialData }: PersonFormProps) {
           setIsSubmitting(false);
           return;
         }
+        startNavigationProgress();
         router.push(res.person ? `/people/${res.person.id}` : '/people');
       }
     } catch {

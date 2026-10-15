@@ -7,19 +7,9 @@ import { PersonLoansList } from '@/components/people/PersonLoansList';
 import type { PersonDetail } from '@/lib/services/people.service';
 
 export function IndividualDashboard({ person }: { person: PersonDetail }) {
-  const dueToday = person.loans.filter(
-    (loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0 && loan.remainingDays === 0
-  ).length;
-  const overdue = person.loans.filter(
-    (loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0 && loan.isExpired
-  ).length;
-  const endingSoon = person.loans.filter(
-    (loan) =>
-      loan.status === 'ACTIVE' &&
-      loan.remainingAmount > 0 &&
-      loan.remainingDays >= 1 &&
-      loan.remainingDays <= 7
-  ).length;
+  const dueToday = person.dueTodayLoansCount;
+  const overdue = person.overdueLoansCount;
+  const endingSoon = person.endingSoonLoansCount;
 
   return (
     <section className="space-y-5" aria-label={`${person.fullName}'s dashboard`}>
@@ -158,7 +148,7 @@ export function IndividualDashboard({ person }: { person: PersonDetail }) {
         <div className="flex items-end justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-slate-800">Loans and balances</h3>
-            <p className="text-xs text-slate-500">{person.loans.length} total loan{person.loans.length === 1 ? '' : 's'}</p>
+            <p className="text-xs text-slate-500">{person.totalLoansCount} total loan{person.totalLoansCount === 1 ? '' : 's'}</p>
           </div>
           <Link
             href={`/loans/new?personId=${person.id}`}
@@ -167,7 +157,15 @@ export function IndividualDashboard({ person }: { person: PersonDetail }) {
             + Add loan
           </Link>
         </div>
-        <PersonLoansList personId={person.id} loans={person.loans} />
+        <PersonLoansList
+          personId={person.id}
+          loans={person.loans}
+          totalCount={person.totalLoansCount}
+          currentPage={person.loanPage}
+          pageSize={person.loanPageSize}
+          totalPages={person.loanTotalPages}
+          pageHref={`/dashboard?personId=${encodeURIComponent(person.id)}`}
+        />
       </section>
     </section>
   );

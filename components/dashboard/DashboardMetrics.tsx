@@ -11,27 +11,23 @@ interface DashboardMetricsProps {
 }
 
 export function DashboardMetrics({ summary }: DashboardMetricsProps) {
-  const overdueLoans = summary.loanDueNotifications.filter((loan) => loan.daysUntilDue < 0);
-  const dueToday = summary.loanDueNotifications.filter((loan) => loan.daysUntilDue === 0);
-  const dueTomorrow = summary.loanDueNotifications.filter((loan) => loan.daysUntilDue === 1);
-  const dueThisWeek = summary.loanDueNotifications.filter(
-    (loan) => loan.daysUntilDue >= 2 && loan.daysUntilDue <= 7
-  );
-
-  const renderDueLoans = (label: string, loans: typeof summary.loanDueNotifications) => {
-    if (loans.length === 0) return null;
+  const renderDueLoans = (
+    label: string,
+    group: typeof summary.loanDueNotifications.overdue
+  ) => {
+    if (group.count === 0) return null;
 
     return (
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[11px] font-bold text-amber-900">
           <span>{label}</span>
           <span>
-            {loans.length} {loans.length === 1 ? 'loan' : 'loans'} ·{' '}
-            {formatRupees(loans.reduce((total, loan) => total + loan.remainingAmount, 0))} remaining
+            {group.count} {group.count === 1 ? 'loan' : 'loans'} ·{' '}
+            {formatRupees(group.totalRemaining)} remaining
           </span>
         </div>
         <div className="space-y-1">
-          {loans.slice(0, 3).map((loan) => (
+          {group.items.map((loan) => (
             <Link
               key={loan.loanId}
               href={`/loans/${loan.loanId}`}
@@ -46,9 +42,9 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
               </span>
             </Link>
           ))}
-          {loans.length > 3 && (
+          {group.count > group.items.length && (
             <p className="px-1 text-[11px] font-medium text-amber-800">
-              + {loans.length - 3} more
+              + {group.count - group.items.length} more
             </p>
           )}
         </div>
@@ -107,8 +103,8 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
           <div className="flex items-center justify-between text-slate-600">
             <span className="text-xs font-bold uppercase tracking-wide">Loans given today</span>
             <span className="text-xs font-semibold text-slate-500">
-              {summary.todayInvestments.length}{' '}
-              {summary.todayInvestments.length === 1 ? 'loan' : 'loans'}
+              {summary.todayInvestmentsCount}{' '}
+              {summary.todayInvestmentsCount === 1 ? 'loan' : 'loans'}
             </span>
           </div>
           <div className="mt-1 text-2xl font-black text-slate-900">
@@ -136,7 +132,7 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
           )}
         </Card>
 
-        {summary.loanDueNotifications.length > 0 && (
+        {summary.loanDueNotifications.totalCount > 0 && (
           <Card className="col-span-2 border-amber-200 bg-amber-50/60 p-4">
             <div className="flex items-center justify-between text-amber-800">
               <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider">
@@ -144,20 +140,20 @@ export function DashboardMetrics({ summary }: DashboardMetricsProps) {
                 Loan Alerts
               </span>
               <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">
-                {summary.loanDueNotifications.length}
+                {summary.loanDueNotifications.totalCount}
               </span>
             </div>
             <p className="mt-1 text-[11px] text-amber-800">
               Ending within 7 days or overdue, with an unpaid balance
             </p>
             <div className="mt-3 space-y-3">
-              {renderDueLoans('Overdue', overdueLoans)}
-              {renderDueLoans('Due today', dueToday)}
-              {renderDueLoans('Due tomorrow', dueTomorrow)}
-              {renderDueLoans('Ending in 2–7 days', dueThisWeek)}
+              {renderDueLoans('Overdue', summary.loanDueNotifications.overdue)}
+              {renderDueLoans('Due today', summary.loanDueNotifications.dueToday)}
+              {renderDueLoans('Due tomorrow', summary.loanDueNotifications.dueTomorrow)}
+              {renderDueLoans('Ending in 2–7 days', summary.loanDueNotifications.dueSoon)}
             </div>
             <Link
-              href="/notifications"
+              href="/alerts"
               prefetch={false}
               className="mt-3 block text-right text-xs font-bold text-emerald-800 hover:text-emerald-900"
             >

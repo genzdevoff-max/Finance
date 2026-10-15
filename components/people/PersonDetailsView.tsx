@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { PersonLoansList } from '@/components/people/PersonLoansList';
 import { deletePersonAction } from '@/app/actions/people.actions';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 import {
   PlusCircle,
   FilePlus2,
@@ -45,10 +46,11 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
       return;
     }
 
+    startNavigationProgress();
     router.push('/people');
   };
 
-  const hasActiveLoans = person.loans.some((l) => l.status === 'ACTIVE');
+  const hasActiveLoans = person.activeLoansCount > 0;
 
   return (
     <div className="space-y-5">
@@ -191,13 +193,13 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
           <Card className="border-amber-200 bg-amber-50 p-3">
             <p className="font-semibold text-amber-900">Expiring today</p>
             <p className="mt-1 text-lg font-black text-amber-900">
-              {person.loans.filter((loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0 && loan.remainingDays === 0).length}
+              {person.dueTodayLoansCount}
             </p>
           </Card>
           <Card className="border-rose-200 bg-rose-50 p-3">
             <p className="font-semibold text-rose-900">Overdue with balance</p>
             <p className="mt-1 text-lg font-black text-rose-900">
-              {person.loans.filter((loan) => loan.status === 'ACTIVE' && loan.remainingAmount > 0 && loan.isExpired).length}
+              {person.overdueLoansCount}
             </p>
           </Card>
         </div>
@@ -207,14 +209,22 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
             <FileText className="h-4 w-4 text-slate-700 stroke-[2.5]" />
-            Loans ({person.loans.length})
+            Loans ({person.totalLoansCount})
           </h3>
           <span className="text-xs font-semibold text-slate-500">
             {person.activeLoansCount} active • {person.completedLoansCount} completed
           </span>
         </div>
 
-        <PersonLoansList personId={person.id} loans={person.loans} />
+        <PersonLoansList
+          personId={person.id}
+          loans={person.loans}
+          totalCount={person.totalLoansCount}
+          currentPage={person.loanPage}
+          pageSize={person.loanPageSize}
+          totalPages={person.loanTotalPages}
+          pageHref={`/people/${person.id}`}
+        />
       </div>
 
       {/* Delete Person Confirmation Modal */}
@@ -230,7 +240,7 @@ export function PersonDetailsView({ person }: PersonDetailsViewProps) {
               Are you sure you want to delete this person?
             </p>
             <p className="font-medium text-rose-700 text-xs">
-              This will permanently remove all {person.loans.length} loans and related collection records.
+              This will permanently remove all {person.totalLoansCount} loans and related collection records.
             </p>
           </div>
         }

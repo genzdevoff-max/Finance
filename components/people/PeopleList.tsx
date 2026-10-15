@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Search, UserPlus, Users, ChevronRight, ChevronLeft, Phone } from 'lucide-react';
 import type { PersonWithFinancials } from '@/lib/services/people.service';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 
 interface PeopleListProps {
   initialPeople: PersonWithFinancials[];
@@ -35,7 +36,9 @@ export function PeopleList({
     const params = new URLSearchParams();
     if (term.trim()) params.set('search', term.trim());
     if (page > 1) params.set('page', String(page));
-    router.push(`/people${params.size ? `?${params.toString()}` : ''}`);
+    const destination = `/people${params.size ? `?${params.toString()}` : ''}`;
+    startNavigationProgress();
+    router.push(destination);
   }, [router]);
 
   React.useEffect(() => {
@@ -82,7 +85,7 @@ export function PeopleList({
           description={`No person found matching "${currentSearch}".`}
         />
       ) : (
-        <div className="space-y-2.5">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
           {initialPeople.map((person) => (
             <Link
               key={person.id}

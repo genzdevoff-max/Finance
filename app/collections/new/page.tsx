@@ -16,10 +16,10 @@ interface NewCollectionPageProps {
 async function CollectionFormData({ searchParams }: NewCollectionPageProps) {
   const { personId, loanId } = await searchParams;
   const peopleWithLoans: PersonWithLoansData[] =
-    await getPeopleWithActiveLoansForCollection();
+    personId ? await getPeopleWithActiveLoansForCollection(undefined, personId) : [];
 
   return (
-    <div className="p-4">
+    <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
       <AddCollectionForm
         people={peopleWithLoans}
         initialPersonId={personId}
@@ -39,7 +39,7 @@ export default function NewCollectionPage(props: NewCollectionPageProps) {
       />
       <Suspense
         fallback={
-          <div className="p-4" aria-label="Loading collection form" role="status">
+          <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8" aria-label="Loading collection form" role="status">
             <Skeleton className="h-[32rem] w-full rounded-2xl" />
           </div>
         }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AlertTriangle, BellRing, CalendarClock } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -6,13 +7,21 @@ import { formatRupees } from '@/lib/utils/currency';
 import { formatDateDisplay, formatPersonDisplayName } from '@/lib/utils/date';
 import type { getLoanDueNotifications } from '@/lib/services/dashboard.service';
 
-type LoanAlert = Awaited<ReturnType<typeof getLoanDueNotifications>>[number];
+type LoanAlert = Awaited<ReturnType<typeof getLoanDueNotifications>>['items'][number];
 
 interface LoanAlertsViewProps {
   alerts: LoanAlert[];
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
 }
 
-export function LoanAlertsView({ alerts }: LoanAlertsViewProps) {
+export function LoanAlertsView({
+  alerts,
+  currentPage,
+  totalPages,
+  totalCount,
+}: LoanAlertsViewProps) {
   const groups: { title: string; items: LoanAlert[]; overdue: boolean }[] = [
     {
       title: 'Overdue',
@@ -38,7 +47,7 @@ export function LoanAlertsView({ alerts }: LoanAlertsViewProps) {
 
   return (
     <div className="space-y-4 p-4">
-      {alerts.length === 0 ? (
+      {totalCount === 0 ? (
         <EmptyState
           icon={BellRing}
           title="No loan alerts"
@@ -112,6 +121,39 @@ export function LoanAlertsView({ alerts }: LoanAlertsViewProps) {
                 </div>
               </section>
             )
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <p className="text-xs text-slate-500">
+                Page {currentPage} of {totalPages} · {totalCount} loans
+              </p>
+              <div className="flex gap-2">
+                <Link
+                  href={currentPage > 1 ? `/alerts?page=${currentPage - 1}` : '/alerts'}
+                  aria-disabled={currentPage <= 1}
+                  tabIndex={currentPage <= 1 ? -1 : undefined}
+                  className={`rounded-lg border p-2 ${
+                    currentPage <= 1
+                      ? 'pointer-events-none border-slate-200 text-slate-400'
+                      : 'border-slate-300 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Link>
+                <Link
+                  href={`/alerts?page=${Math.min(currentPage + 1, totalPages)}`}
+                  aria-disabled={currentPage >= totalPages}
+                  tabIndex={currentPage >= totalPages ? -1 : undefined}
+                  className={`rounded-lg border p-2 ${
+                    currentPage >= totalPages
+                      ? 'pointer-events-none border-slate-200 text-slate-400'
+                      : 'border-slate-300 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
           )}
         </>
       )}

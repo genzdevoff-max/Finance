@@ -9,9 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
-import { EmptyState } from '@/components/shared/EmptyState';
 import { createCollectionAction } from '@/app/actions/collections.actions';
-import { CheckCircle2, AlertCircle, ArrowRight, IndianRupee, Users } from 'lucide-react';
+import { CheckCircle2, AlertCircle, IndianRupee, Loader2 } from 'lucide-react';
 import { installmentFrequencyLabel } from '@/lib/constants/installment';
 
 export interface PersonWithLoansData {
@@ -35,17 +34,20 @@ interface AddCollectionFormProps {
 }
 
 export function AddCollectionForm({
-  people,
+  people: initialPeople,
   initialPersonId,
   initialLoanId,
 }: AddCollectionFormProps) {
   const router = useRouter();
 
-  // Find initial person
-  const initialPerson = people.find((p) => p.id === initialPersonId) || (people.length === 1 ? people[0] : null);
-  const [selectedPersonId, setSelectedPersonId] = React.useState<string>(initialPerson?.id || '');
-
-  const currentPerson = people.find((p) => p.id === selectedPersonId);
+  const initialPerson =
+    initialPeople.find((person) => person.id === initialPersonId) ??
+    (initialPeople.length === 1 ? initialPeople[0] : null);
+  const [currentPerson, setCurrentPerson] = React.useState<PersonWithLoansData | null>(initialPerson);
+  const [personSearch, setPersonSearch] = React.useState(initialPerson?.fullName ?? '');
+  const [personResults, setPersonResults] = React.useState<PersonWithLoansData[]>([]);
+  const [isSearchingPeople, setIsSearchingPeople] = React.useState(false);
+  const [personSearchError, setPersonSearchError] = React.useState<string | null>(null);
 
   // Selected loan
   const [selectedLoanId, setSelectedLoanId] = React.useState<string>(() => {
@@ -55,6 +57,49 @@ export function AddCollectionForm({
     }
     return '';
   });
+
+  React.useEffect(() => {
+    const query = personSearch.trim();
+    if (query.length < 2 || query.toLocaleLowerCase() === currentPerson?.fullName.toLocaleLowerCase()) {
+      setPersonResults([]);
+      setPersonSearchError(null);
+      setIsSearchingPeople(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setIsSearchingPeople(true);
+      setPersonSearchError(null);
+      try {
+        const response = await fetch(
+          `/api/people/active-loans?q=${encodeURIComponent(query)}`,
+          { cache: 'no-store', signal: controller.signal }
+        );
+        if (!response.ok) throw new Error('Unable to search active loans.');
+        const data: { people: PersonWithLoansData[] } = await response.json();
+        setPersonResults(data.people);
+      } catch (searchError) {
+        if (searchError instanceof Error && searchError.name === 'AbortError') return;
+        console.error('Collection borrower search failed:', searchError);
+        setPersonSearchError('Search failed. Please try again.');
+      } finally {
+        if (!controller.signal.aborted) setIsSearchingPeople(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [personSearch, currentPerson?.fullName]);
+
+  const selectPerson = (person: PersonWithLoansData) => {
+    setCurrentPerson(person);
+    setPersonSearch(person.fullName);
+    setPersonResults([]);
+    setSelectedLoanId(person.activeLoans.length === 1 ? person.activeLoans[0].id : '');
+  };
 
   // When person changes, auto-select loan if they only have one
   React.useEffect(() => {
@@ -116,7 +161,7 @@ export function AddCollectionForm({
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!selectedPersonId) {
+    if (!currentPerson) {
       setErrorMsg('Please select a person.');
       return;
     }
@@ -220,19 +265,6 @@ export function AddCollectionForm({
     );
   }
 
-  // If no borrowers with active loans exist
-  if (people.length === 0) {
-    return (
-      <EmptyState
-        icon={Users}
-        title="No active loans found"
-        description="To collect payments, you need at least one borrower with an active loan."
-        actionHref="/loans/new"
-        actionText="Create New Loan"
-      />
-    );
-  }
-
   return (
     <Card className="bg-white p-5 shadow-sm space-y-5">
       <form onSubmit={handleOpenConfirm} className="space-y-5">
@@ -244,24 +276,68 @@ export function AddCollectionForm({
         )}
 
         {/* STEP 1: Select Person */}
-        <div className="space-y-1.5">
-          <label htmlFor="personSelect" className="block text-sm font-bold text-slate-800">
+        <div className="relative space-y-1.5">
+          <label htmlFor="person-search" className="block text-sm font-bold text-slate-800">
             1. Select Person *
           </label>
-          <select
-            id="personSelect"
-            value={selectedPersonId}
-            onChange={(e) => setSelectedPersonId(e.target.value)}
-            className="flex h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-base font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-          >
-            <option value="">Choose person...</option>
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.fullName} ({p.activeLoans.length} active{' '}
-                {p.activeLoans.length === 1 ? 'loan' : 'loans'})
-              </option>
-            ))}
-          </select>
+          <Input
+            id="person-search"
+            type="search"
+            autoComplete="off"
+            placeholder="Search name or phone (2+ characters)"
+            value={personSearch}
+            onChange={(event) => {
+              const value = event.target.value;
+              setPersonSearch(value);
+              setPersonResults([]);
+              setPersonSearchError(null);
+              if (currentPerson && value !== currentPerson.fullName) {
+                setCurrentPerson(null);
+                setSelectedLoanId('');
+              }
+            }}
+            className="h-12"
+            aria-describedby="collection-person-search-status"
+          />
+          {personResults.length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+              {personResults.map((person) => (
+                <button
+                  key={person.id}
+                  type="button"
+                  onClick={() => selectPerson(person)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-emerald-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{person.fullName}</span>
+                    <span className="block text-xs text-slate-500">
+                      {person.activeLoans.length} active {person.activeLoans.length === 1 ? 'loan' : 'loans'}
+                    </span>
+                  </span>
+                  {person.phone && <span className="shrink-0 text-xs text-slate-500">{person.phone}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          <p id="collection-person-search-status" role={personSearchError ? 'alert' : 'status'} className="flex items-center gap-1.5 text-xs text-slate-500">
+            {isSearchingPeople && <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />}
+            {personSearchError ||
+              (isSearchingPeople
+                ? 'Searching...'
+                : currentPerson
+                  ? `Selected: ${currentPerson.fullName}`
+                  : personSearch.trim().length >= 2 && personResults.length === 0 && !isSearchingPeople
+                    ? 'No matching people with an active loan found.'
+                    : 'Enter at least 2 characters to search.')}
+          </p>
+          {!isSearchingPeople && personSearch.trim().length >= 2 && personResults.length === 0 && !currentPerson && (
+            <Link
+              href="/loans/new"
+              className="inline-flex text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              Create a loan
+            </Link>
+          )}
         </div>
 
         {/* STEP 2: Select Active Loan */}

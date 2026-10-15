@@ -12,26 +12,41 @@ import { Card } from '@/components/ui/Card';
 import { getTodayDateString } from '@/lib/utils/date';
 import { formatRupeesPlain } from '@/lib/utils/currency';
 import { installmentFrequencyLabel } from '@/lib/constants/installment';
+import { Loader2 } from 'lucide-react';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 
-interface LoanFormProps {
-  people: { id: string; fullName: string }[];
-  defaultPersonId?: string;
+interface PersonOption {
+  id: string;
+  fullName: string;
+  phone?: string | null;
 }
 
-export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
+interface LoanFormProps {
+  defaultPerson?: PersonOption;
+}
+
+export function LoanForm({ defaultPerson }: LoanFormProps) {
   const router = useRouter();
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [selectedPerson, setSelectedPerson] = React.useState<PersonOption | null>(
+    defaultPerson ?? null
+  );
+  const [personSearch, setPersonSearch] = React.useState(defaultPerson?.fullName ?? '');
+  const [personResults, setPersonResults] = React.useState<PersonOption[]>([]);
+  const [isSearchingPeople, setIsSearchingPeople] = React.useState(false);
+  const [personSearchError, setPersonSearchError] = React.useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<LoanFormData>({
     resolver: zodResolver(loanSchema),
     defaultValues: {
-      personId: defaultPersonId || (people.length === 1 ? people[0].id : ''),
+      personId: defaultPerson?.id ?? '',
       loanAmount: undefined,
       loanDate: getTodayDateString(),
       durationDays: 100,
@@ -45,6 +60,49 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
   const enteredDaily = watch('dailyInstallment');
   const installmentFrequency = watch('installmentFrequency');
   const frequencyLabel = installmentFrequencyLabel(installmentFrequency);
+
+  React.useEffect(() => {
+    const query = personSearch.trim();
+    if (query.length < 2 || query.toLocaleLowerCase() === selectedPerson?.fullName.toLocaleLowerCase()) {
+      setPersonResults([]);
+      setPersonSearchError(null);
+      setIsSearchingPeople(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setIsSearchingPeople(true);
+      setPersonSearchError(null);
+      try {
+        const response = await fetch(`/api/people/search?q=${encodeURIComponent(query)}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('Unable to search people.');
+        const data: { people: PersonOption[] } = await response.json();
+        setPersonResults(data.people);
+      } catch (searchError) {
+        if (searchError instanceof Error && searchError.name === 'AbortError') return;
+        console.error('Loan person search failed:', searchError);
+        setPersonSearchError('Search failed. Please try again.');
+      } finally {
+        if (!controller.signal.aborted) setIsSearchingPeople(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [personSearch, selectedPerson?.fullName]);
+
+  const selectPerson = (person: PersonOption) => {
+    setSelectedPerson(person);
+    setPersonSearch(person.fullName);
+    setPersonResults([]);
+    setValue('personId', person.id, { shouldValidate: true });
+  };
 
   const onSubmit = async (data: LoanFormData) => {
     setErrorMsg(null);
@@ -67,6 +125,7 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
         return;
       }
 
+      startNavigationProgress();
       router.push(`/people/${data.personId}`);
     } catch {
       setErrorMsg('An unexpected error occurred. Please try again.');
@@ -84,22 +143,56 @@ export function LoanForm({ people, defaultPersonId }: LoanFormProps) {
         )}
 
         {/* Person Selector */}
-        <div className="space-y-1.5">
-          <label htmlFor="personId" className="block text-sm font-semibold text-slate-700">
+        <div className="relative space-y-1.5">
+          <label htmlFor="person-search" className="block text-sm font-semibold text-slate-700">
             Person / Client *
           </label>
-          <select
-            id="personId"
-            className="flex h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-base text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            {...register('personId')}
-          >
-            <option value="">Select Person...</option>
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.fullName}
-              </option>
-            ))}
-          </select>
+          <input type="hidden" {...register('personId')} />
+          <Input
+            id="person-search"
+            type="search"
+            autoComplete="off"
+            placeholder="Search name or phone (2+ characters)"
+            value={personSearch}
+            onChange={(event) => {
+              const value = event.target.value;
+              setPersonSearch(value);
+              setPersonResults([]);
+              setPersonSearchError(null);
+              if (selectedPerson && value !== selectedPerson.fullName) {
+                setSelectedPerson(null);
+                setValue('personId', '', { shouldValidate: true });
+              }
+            }}
+            className="h-12"
+            aria-describedby="person-search-status"
+          />
+          {personResults.length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+              {personResults.map((person) => (
+                <button
+                  key={person.id}
+                  type="button"
+                  onClick={() => selectPerson(person)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-emerald-50"
+                >
+                  <span className="truncate text-sm font-semibold text-slate-800">{person.fullName}</span>
+                  {person.phone && <span className="shrink-0 text-xs text-slate-500">{person.phone}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          <p id="person-search-status" role={personSearchError ? 'alert' : 'status'} className="flex items-center gap-1.5 text-xs text-slate-500">
+            {isSearchingPeople && <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />}
+            {personSearchError ||
+              (isSearchingPeople
+                ? 'Searching...'
+                : selectedPerson
+                  ? `Selected: ${selectedPerson.fullName}`
+                  : personSearch.trim().length >= 2 && personResults.length === 0 && !isSearchingPeople
+                    ? 'No matching people found.'
+                    : 'Enter at least 2 characters to search.')}
+          </p>
           {errors.personId?.message && (
             <p className="text-xs font-medium text-rose-600">{errors.personId.message}</p>
           )}

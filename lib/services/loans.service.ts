@@ -1,6 +1,6 @@
 import type { Loan } from '@/lib/db/schema';
 import { db, people, loans, collections, isDbConfigured, assertDbConfigured } from '@/lib/db';
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { addDaysToDateString, getLoanExpiryState } from '@/lib/utils/date';
 
@@ -45,14 +45,38 @@ export interface PersonWithActiveLoansForCollection {
 }
 
 /**
- * Loads only people with a positive balance on an active loan in one query.
+ * Loads active loans for a bounded set of matching people.
  */
-export async function getPeopleWithActiveLoansForCollection(): Promise<
+export async function getPeopleWithActiveLoansForCollection(
+  searchQuery?: string,
+  personId?: string
+): Promise<
   PersonWithActiveLoansForCollection[]
 > {
   assertDbConfigured();
   if (isDbConfigured()) {
     try {
+      const term = searchQuery?.trim().toLowerCase();
+      const personFilter = personId
+        ? eq(people.id, personId)
+        : term && term.length >= 2
+          ? or(
+              sql`LOWER(${people.fullName}) LIKE ${`%${term}%`}`,
+              sql`LOWER(${people.phone}) LIKE ${`%${term}%`}`
+            )
+          : undefined;
+      if (!personFilter) return [];
+
+      const matchedPeople = await db
+        .select({ id: people.id })
+        .from(people)
+        .innerJoin(loans, eq(loans.personId, people.id))
+        .where(and(personFilter, eq(loans.status, 'ACTIVE')))
+        .groupBy(people.id, people.fullName)
+        .orderBy(asc(people.fullName), asc(people.id))
+        .limit(10);
+      if (matchedPeople.length === 0) return [];
+
       const rows = await db
         .select({
           personId: people.id,
@@ -68,7 +92,15 @@ export async function getPeopleWithActiveLoansForCollection(): Promise<
         .from(loans)
         .innerJoin(people, eq(people.id, loans.personId))
         .leftJoin(collections, eq(collections.loanId, loans.id))
-        .where(eq(loans.status, 'ACTIVE'))
+        .where(
+          and(
+            eq(loans.status, 'ACTIVE'),
+            inArray(
+              loans.personId,
+              matchedPeople.map((person) => person.id)
+            )
+          )
+        )
         .groupBy(
           loans.id,
           people.id,
@@ -166,50 +198,86 @@ export async function syncLoanStatus(loanId: string): Promise<'ACTIVE' | 'COMPLE
 /**
  * Gets a single loan with computed financials, running balances, and payment history.
  */
-export async function getLoanById(id: string) {
+export async function getLoanById(id: string, requestedPage = 1) {
   assertDbConfigured();
   if (isDbConfigured()) {
     try {
-      const [loanRecord] = await db
-        .select()
+      const [loanResult] = await db
+        .select({
+          loan: loans,
+          personName: people.fullName,
+          personPhone: people.phone,
+        })
         .from(loans)
+        .leftJoin(people, eq(people.id, loans.personId))
         .where(eq(loans.id, id));
 
-      if (loanRecord) {
-        const [person] = await db
-          .select()
-          .from(people)
-          .where(eq(people.id, loanRecord.personId));
-
-        const loanCols = await db
-          .select()
+      if (loanResult) {
+        const { loan: loanRecord, personName, personPhone } = loanResult;
+        const pageSize = 50;
+        const requestedCollectionPage = Math.max(1, Math.floor(requestedPage));
+        const runningCollections = db
+          .select({
+            id: collections.id,
+            loanId: collections.loanId,
+            personId: collections.personId,
+            amount: collections.amount,
+            collectedAt: collections.collectedAt,
+            notes: collections.notes,
+            createdAt: collections.createdAt,
+            updatedAt: collections.updatedAt,
+            accumulatedAmount: sql<number>`
+              SUM(${collections.amount}) OVER (
+                ORDER BY ${collections.collectedAt} ASC, ${collections.id} ASC
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+              )
+            `.as('accumulated_amount'),
+          })
           .from(collections)
-          .where(eq(collections.loanId, id));
-
-        // Sort chronologically ascending
-        loanCols.sort((a, b) => new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime());
-
-        let accumulated = 0;
-        const collectionsWithBalance: CollectionWithBalance[] = [];
-
-        for (const c of loanCols) {
-          accumulated += Number(c.amount);
-          const remainingAfter = Math.max(0, Number(loanRecord.loanAmount) - accumulated);
-          collectionsWithBalance.push({
-            id: c.id,
-            loanId: c.loanId,
-            personId: c.personId,
-            amount: Number(c.amount),
-            collectedAt: new Date(c.collectedAt),
-            notes: c.notes,
-            createdAt: new Date(c.createdAt),
-            updatedAt: new Date(c.updatedAt),
-            remainingAfterCollection: remainingAfter,
-          });
-        }
-
-        const collectionsNewestFirst = [...collectionsWithBalance].reverse();
-        const totalCollected = accumulated;
+          .where(eq(collections.loanId, id))
+          .as('running_collections');
+        const [collectionSummaryRows, requestedCollectionRows] = await Promise.all([
+          db
+            .select({
+              totalCollected: sql<string>`COALESCE(SUM(${collections.amount}), 0)`,
+              count: sql<number>`COUNT(*)`,
+            })
+            .from(collections)
+            .where(eq(collections.loanId, id)),
+          db
+            .select()
+            .from(runningCollections)
+            .orderBy(desc(runningCollections.collectedAt), desc(runningCollections.id))
+            .limit(pageSize)
+            .offset((requestedCollectionPage - 1) * pageSize),
+        ]);
+        const collectionCount = Number(collectionSummaryRows[0]?.count ?? 0);
+        const collectionPageCount = Math.max(1, Math.ceil(collectionCount / pageSize));
+        const collectionPage = Math.min(requestedCollectionPage, collectionPageCount);
+        const collectionRows =
+          collectionPage === requestedCollectionPage
+            ? requestedCollectionRows
+            : await db
+                .select()
+                .from(runningCollections)
+                .orderBy(desc(runningCollections.collectedAt), desc(runningCollections.id))
+                .limit(pageSize)
+                .offset((collectionPage - 1) * pageSize);
+        const totalCollected = Number(collectionSummaryRows[0]?.totalCollected ?? 0);
+        const collectionsNewestFirst: CollectionWithBalance[] = collectionRows.map((c) => ({
+          id: c.id,
+          loanId: c.loanId,
+          personId: c.personId,
+          amount: Number(c.amount),
+          collectedAt: new Date(c.collectedAt),
+          notes: c.notes,
+          createdAt: new Date(c.createdAt),
+          updatedAt: new Date(c.updatedAt),
+          remainingAfterCollection: Math.max(
+            0,
+            Number(loanRecord.loanAmount) - Number(c.accumulatedAmount)
+          ),
+        }));
         const remainingAmount = Math.max(0, Number(loanRecord.loanAmount) - totalCollected);
         const percentageCollected =
           Number(loanRecord.loanAmount) > 0
@@ -230,15 +298,18 @@ export async function getLoanById(id: string) {
           notes: loanRecord.notes,
           createdAt: new Date(loanRecord.createdAt),
           updatedAt: new Date(loanRecord.updatedAt),
-          personName: person?.fullName || 'Contact',
-          personPhone: person?.phone || null,
+          personName: personName || 'Contact',
+          personPhone: personPhone || null,
           remainingDays: expiry.remainingDays,
           isExpired: expiry.isExpired,
           expiryLabel: expiry.label,
           totalCollected,
           remainingAmount,
           percentageCollected,
-          collectionCount: loanCols.length,
+          collectionCount,
+          collectionPage,
+          collectionPageSize: pageSize,
+          collectionTotalPages: collectionPageCount,
           collections: collectionsNewestFirst,
         };
       }
@@ -255,10 +326,13 @@ export async function getLoanById(id: string) {
 /**
  * Gets all loans for a specific person with computed totals.
  */
-export async function getLoansByPersonId(personId: string): Promise<LoanWithFinancials[]> {
+export async function getLoansByPersonId(personId: string, requestedPage = 1) {
   assertDbConfigured();
   if (isDbConfigured()) {
     try {
+      const pageSize = 25;
+      const safeRequestedPage =
+        Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
       const collectionTotals = db
         .select({
           loanId: collections.loanId,
@@ -266,24 +340,55 @@ export async function getLoansByPersonId(personId: string): Promise<LoanWithFina
           collectionCount: sql<string>`COUNT(${collections.id})`.as('collection_count'),
         })
         .from(collections)
+        .innerJoin(loans, eq(loans.id, collections.loanId))
+        .where(eq(loans.personId, personId))
         .groupBy(collections.loanId)
         .as('collection_totals');
 
-      const rows = await db
-        .select({
-          loan: loans,
-          personName: people.fullName,
-          personPhone: people.phone,
-          totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
-          collectionCount: sql<string>`COALESCE(${collectionTotals.collectionCount}, 0)`,
-        })
-        .from(loans)
-        .innerJoin(people, eq(people.id, loans.personId))
-        .leftJoin(collectionTotals, eq(collectionTotals.loanId, loans.id))
-        .where(eq(loans.personId, personId))
-        .orderBy(desc(loans.loanDate));
+      const [countRows, requestedRows] = await Promise.all([
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(loans)
+          .where(eq(loans.personId, personId)),
+        db
+          .select({
+            loan: loans,
+            personName: people.fullName,
+            personPhone: people.phone,
+            totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
+            collectionCount: sql<string>`COALESCE(${collectionTotals.collectionCount}, 0)`,
+          })
+          .from(loans)
+          .innerJoin(people, eq(people.id, loans.personId))
+          .leftJoin(collectionTotals, eq(collectionTotals.loanId, loans.id))
+          .where(eq(loans.personId, personId))
+          .orderBy(desc(loans.loanDate), desc(loans.id))
+          .limit(pageSize)
+          .offset((safeRequestedPage - 1) * pageSize),
+      ]);
+      const totalCount = Number(countRows[0]?.count ?? 0);
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+      const currentPage = Math.min(safeRequestedPage, totalPages);
+      const rows =
+        currentPage === safeRequestedPage
+          ? requestedRows
+          : await db
+              .select({
+                loan: loans,
+                personName: people.fullName,
+                personPhone: people.phone,
+                totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
+                collectionCount: sql<string>`COALESCE(${collectionTotals.collectionCount}, 0)`,
+              })
+              .from(loans)
+              .innerJoin(people, eq(people.id, loans.personId))
+              .leftJoin(collectionTotals, eq(collectionTotals.loanId, loans.id))
+              .where(eq(loans.personId, personId))
+              .orderBy(desc(loans.loanDate), desc(loans.id))
+              .limit(pageSize)
+              .offset((currentPage - 1) * pageSize);
 
-      return rows.map(({ loan, personName, personPhone, totalCollected, collectionCount }) => {
+      const items = rows.map(({ loan, personName, personPhone, totalCollected, collectionCount }) => {
         const collected = Number(totalCollected);
         const remainingAmount = Math.max(0, Number(loan.loanAmount) - collected);
         const percentageCollected =
@@ -311,6 +416,7 @@ export async function getLoansByPersonId(personId: string): Promise<LoanWithFina
           collectionCount: Number(collectionCount),
         };
       });
+      return { items, totalCount, currentPage, totalPages, pageSize };
     } catch (err) {
       console.error('Database query failed in getLoansByPersonId:', err);
       throw err;

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { updateCollectionAction } from '@/app/actions/collections.actions';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 import { AlertCircle, IndianRupee } from 'lucide-react';
 
 interface EditCollectionFormProps {
@@ -80,6 +81,7 @@ export function EditCollectionForm({
         return;
       }
 
+      startNavigationProgress();
       router.push(`/loans/${collection.loanId}`);
     } catch {
       setIsSubmitting(false);

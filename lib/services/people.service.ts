@@ -12,7 +12,7 @@ import {
 import { asc, eq, inArray, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { format, startOfMonth, startOfWeek } from 'date-fns';
-import { getTodayDateString } from '@/lib/utils/date';
+import { addDaysToDateString, getTodayDateString } from '@/lib/utils/date';
 
 export interface PersonWithFinancials extends Person {
   totalBorrowed: number; // in paise
@@ -25,10 +25,16 @@ export interface PersonWithFinancials extends Person {
 
 export interface PersonDetail extends PersonWithFinancials {
   loans: LoanWithFinancials[];
+  loanPage: number;
+  loanTotalPages: number;
+  loanPageSize: number;
   investedToday: number;
   investedThisWeek: number;
   investedThisMonth: number;
   investedThisYear: number;
+  dueTodayLoansCount: number;
+  endingSoonLoansCount: number;
+  overdueLoansCount: number;
 }
 
 /**
@@ -134,6 +140,52 @@ export async function getPeopleOptions(): Promise<{ id: string; fullName: string
   }
 }
 
+export async function searchPeopleOptions(
+  searchQuery: string
+): Promise<{ id: string; fullName: string; phone: string | null }[]> {
+  assertDbConfigured();
+  await ensureDbInitialized();
+
+  const term = searchQuery.trim().toLowerCase();
+  if (term.length < 2) return [];
+
+  try {
+    return await db
+      .select({ id: people.id, fullName: people.fullName, phone: people.phone })
+      .from(people)
+      .where(
+        or(
+          sql`LOWER(${people.fullName}) LIKE ${`%${term}%`}`,
+          sql`LOWER(${people.phone}) LIKE ${`%${term}%`}`
+        )
+      )
+      .orderBy(asc(people.fullName), asc(people.id))
+      .limit(10);
+  } catch (err) {
+    console.error('Database query failed in searchPeopleOptions:', err);
+    throw err;
+  }
+}
+
+export async function getPersonOptionById(
+  id: string
+): Promise<{ id: string; fullName: string } | null> {
+  assertDbConfigured();
+  await ensureDbInitialized();
+
+  try {
+    const [person] = await db
+      .select({ id: people.id, fullName: people.fullName })
+      .from(people)
+      .where(eq(people.id, id))
+      .limit(1);
+    return person ?? null;
+  } catch (err) {
+    console.error('Database query failed in getPersonOptionById:', err);
+    throw err;
+  }
+}
+
 export async function getPeopleListPage(
   searchQuery: string | undefined,
   page: number,
@@ -234,7 +286,7 @@ export async function getPeopleListPage(
 /**
  * Gets a single person by ID with full financial metrics and loans list.
  */
-export async function getPersonById(id: string): Promise<PersonDetail | null> {
+export async function getPersonById(id: string, loanPage = 1): Promise<PersonDetail | null> {
   assertDbConfigured();
   if (isDbConfigured()) {
     try {
@@ -244,36 +296,62 @@ export async function getPersonById(id: string): Promise<PersonDetail | null> {
         .where(eq(people.id, id));
 
       if (personRecord) {
-        const personLoans = await getLoansByPersonId(id);
-
-        let totalBorrowed = 0;
-        let totalCollected = 0;
-        let activeLoansCount = 0;
-        let completedLoansCount = 0;
         const today = getTodayDateString();
         const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
         const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
         const yearStart = `${new Date().getFullYear()}-01-01`;
-        let investedToday = 0;
-        let investedThisWeek = 0;
-        let investedThisMonth = 0;
-        let investedThisYear = 0;
-
-        for (const l of personLoans) {
-          totalBorrowed += l.loanAmount;
-          totalCollected += l.totalCollected;
-          if (l.loanDate === today) investedToday += l.loanAmount;
-          if (l.loanDate >= weekStart && l.loanDate <= today) investedThisWeek += l.loanAmount;
-          if (l.loanDate >= monthStart && l.loanDate <= today) investedThisMonth += l.loanAmount;
-          if (l.loanDate >= yearStart && l.loanDate <= today) investedThisYear += l.loanAmount;
-          if (l.status === 'ACTIVE') {
-            activeLoansCount++;
-          } else {
-            completedLoansCount++;
-          }
-        }
-
-        const totalOutstanding = Math.max(0, totalBorrowed - totalCollected);
+        const tomorrow = addDaysToDateString(today, 1) || today;
+        const weekEnd = addDaysToDateString(today, 7) || today;
+        const collectionTotals = db
+          .select({
+            loanId: collections.loanId,
+            totalCollected: sql<string>`SUM(${collections.amount})`.as('total_collected'),
+          })
+          .from(collections)
+          .innerJoin(loans, eq(loans.id, collections.loanId))
+          .where(eq(loans.personId, id))
+          .groupBy(collections.loanId)
+          .as('person_collection_totals');
+        const expectedEndDate = sql<string | null>`
+          COALESCE(
+            ${loans.expectedEndDate},
+            DATE_FORMAT(
+              DATE_ADD(
+                STR_TO_DATE(${loans.loanDate}, '%Y-%m-%d'),
+                INTERVAL COALESCE(${loans.durationDays}, 0) DAY
+              ),
+              '%Y-%m-%d'
+            )
+          )
+        `;
+        const remainingAmount = sql<number>`
+          GREATEST(0, ${loans.loanAmount} - COALESCE(${collectionTotals.totalCollected}, 0))
+        `;
+        const [summaryRows, loanPageResult] = await Promise.all([
+          db
+            .select({
+              totalBorrowed: sql<string>`COALESCE(SUM(${loans.loanAmount}), 0)`,
+              totalCollected: sql<string>`COALESCE(SUM(COALESCE(${collectionTotals.totalCollected}, 0)), 0)`,
+              totalLoansCount: sql<number>`COUNT(*)`,
+              activeLoansCount: sql<number>`COALESCE(SUM(CASE WHEN ${loans.status} = 'ACTIVE' THEN 1 ELSE 0 END), 0)`,
+              completedLoansCount: sql<number>`COALESCE(SUM(CASE WHEN ${loans.status} != 'ACTIVE' THEN 1 ELSE 0 END), 0)`,
+              investedToday: sql<string>`COALESCE(SUM(CASE WHEN ${loans.loanDate} = ${today} THEN ${loans.loanAmount} ELSE 0 END), 0)`,
+              investedThisWeek: sql<string>`COALESCE(SUM(CASE WHEN ${loans.loanDate} >= ${weekStart} AND ${loans.loanDate} <= ${today} THEN ${loans.loanAmount} ELSE 0 END), 0)`,
+              investedThisMonth: sql<string>`COALESCE(SUM(CASE WHEN ${loans.loanDate} >= ${monthStart} AND ${loans.loanDate} <= ${today} THEN ${loans.loanAmount} ELSE 0 END), 0)`,
+              investedThisYear: sql<string>`COALESCE(SUM(CASE WHEN ${loans.loanDate} >= ${yearStart} AND ${loans.loanDate} <= ${today} THEN ${loans.loanAmount} ELSE 0 END), 0)`,
+              dueTodayLoansCount: sql<number>`COALESCE(SUM(CASE WHEN ${loans.status} = 'ACTIVE' AND ${expectedEndDate} = ${today} AND ${remainingAmount} > 0 THEN 1 ELSE 0 END), 0)`,
+              endingSoonLoansCount: sql<number>`COALESCE(SUM(CASE WHEN ${loans.status} = 'ACTIVE' AND ${expectedEndDate} > ${today} AND ${expectedEndDate} <= ${weekEnd} AND ${remainingAmount} > 0 THEN 1 ELSE 0 END), 0)`,
+              overdueLoansCount: sql<number>`COALESCE(SUM(CASE WHEN ${loans.status} = 'ACTIVE' AND ${expectedEndDate} < ${today} AND ${remainingAmount} > 0 THEN 1 ELSE 0 END), 0)`,
+            })
+            .from(loans)
+            .leftJoin(collectionTotals, eq(collectionTotals.loanId, loans.id))
+            .where(eq(loans.personId, id)),
+          getLoansByPersonId(id, loanPage),
+        ]);
+        const summary = summaryRows[0];
+        const totalBorrowed = Number(summary?.totalBorrowed ?? 0);
+        const totalCollected = Number(summary?.totalCollected ?? 0);
+        const totalLoansCount = Number(summary?.totalLoansCount ?? 0);
 
         return {
           id: personRecord.id,
@@ -287,15 +365,21 @@ export async function getPersonById(id: string): Promise<PersonDetail | null> {
           updatedAt: new Date(personRecord.updatedAt),
           totalBorrowed,
           totalCollected,
-          totalOutstanding,
-          activeLoansCount,
-          completedLoansCount,
-          totalLoansCount: personLoans.length,
-          loans: personLoans,
-          investedToday,
-          investedThisWeek,
-          investedThisMonth,
-          investedThisYear,
+          totalOutstanding: Math.max(0, totalBorrowed - totalCollected),
+          activeLoansCount: Number(summary?.activeLoansCount ?? 0),
+          completedLoansCount: Number(summary?.completedLoansCount ?? 0),
+          totalLoansCount,
+          loans: loanPageResult.items,
+          loanPage: loanPageResult.currentPage,
+          loanTotalPages: loanPageResult.totalPages,
+          loanPageSize: loanPageResult.pageSize,
+          investedToday: Number(summary?.investedToday ?? 0),
+          investedThisWeek: Number(summary?.investedThisWeek ?? 0),
+          investedThisMonth: Number(summary?.investedThisMonth ?? 0),
+          investedThisYear: Number(summary?.investedThisYear ?? 0),
+          dueTodayLoansCount: Number(summary?.dueTodayLoansCount ?? 0),
+          endingSoonLoansCount: Number(summary?.endingSoonLoansCount ?? 0),
+          overdueLoansCount: Number(summary?.overdueLoansCount ?? 0),
         };
       }
       return null;

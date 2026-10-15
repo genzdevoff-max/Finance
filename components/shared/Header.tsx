@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { startNavigationProgress } from '@/lib/utils/navigation';
 
 interface HeaderProps {
   title: string;
@@ -21,8 +22,10 @@ export function Header({ title, subtitle, backHref, onBack, action }: HeaderProp
     if (onBack) {
       onBack();
     } else if (backHref) {
+      startNavigationProgress();
       router.push(backHref);
     } else {
+      startNavigationProgress();
       router.back();
     }
   };
@@ -30,7 +33,7 @@ export function Header({ title, subtitle, backHref, onBack, action }: HeaderProp
   const showBackButton = !!backHref || !!onBack;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-4 py-3 pt-safe">
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 px-4 py-3 pt-safe backdrop-blur-md sm:px-6 lg:px-8">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {showBackButton && (
@@ -44,7 +47,7 @@ export function Header({ title, subtitle, backHref, onBack, action }: HeaderProp
             </button>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold text-slate-900 tracking-tight leading-tight">
+            <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-slate-900 sm:text-xl">
               {title}
             </h1>
             {subtitle && <p className="truncate text-xs text-slate-500 font-medium">{subtitle}</p>}

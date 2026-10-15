@@ -11,10 +11,23 @@ import { installmentFrequencyLabel } from '@/lib/constants/installment';
 interface PersonLoansListProps {
   personId: string;
   loans: LoanWithFinancials[];
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
+  totalPages: number;
+  pageHref: string;
 }
 
-export function PersonLoansList({ personId, loans }: PersonLoansListProps) {
-  if (loans.length === 0) {
+export function PersonLoansList({
+  personId,
+  loans,
+  totalCount,
+  currentPage,
+  pageSize,
+  totalPages,
+  pageHref,
+}: PersonLoansListProps) {
+  if (totalCount === 0) {
     return (
       <EmptyState
         icon={FileText}
@@ -26,9 +39,12 @@ export function PersonLoansList({ personId, loans }: PersonLoansListProps) {
     );
   }
 
+  const pageUrl = (page: number) =>
+    `${pageHref}${pageHref.includes('?') ? '&' : '?'}loanPage=${page}`;
+
   return (
     <div className="space-y-3">
-      {loans.map((loan, idx) => {
+    {loans.map((loan, idx) => {
         const expiryState = getLoanExpiryState(loan.expectedEndDate);
         const showExpiryWarning =
           loan.status === 'ACTIVE' &&
@@ -46,7 +62,7 @@ export function PersonLoansList({ personId, loans }: PersonLoansListProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-slate-900">
-                    Loan #{loans.length - idx}
+                    Loan #{totalCount - (currentPage - 1) * pageSize - idx}
                   </span>
                   <Badge variant={loan.status === 'ACTIVE' ? 'active' : 'completed'}>
                     {loan.status}
@@ -138,6 +154,39 @@ export function PersonLoansList({ personId, loans }: PersonLoansListProps) {
           </Link>
         );
       })}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+          <p className="text-xs text-slate-500">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Link
+              href={pageUrl(currentPage - 1)}
+              aria-disabled={currentPage <= 1}
+              tabIndex={currentPage <= 1 ? -1 : undefined}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                currentPage <= 1
+                  ? 'pointer-events-none border-slate-200 text-slate-400'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Previous
+            </Link>
+            <Link
+              href={pageUrl(currentPage + 1)}
+              aria-disabled={currentPage >= totalPages}
+              tabIndex={currentPage >= totalPages ? -1 : undefined}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                currentPage >= totalPages
+                  ? 'pointer-events-none border-slate-200 text-slate-400'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Next
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

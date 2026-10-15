@@ -8,7 +8,7 @@ import {
   assertDbConfigured,
   ensureDbInitialized,
 } from '@/lib/db';
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, gt, lte, sql } from 'drizzle-orm';
 import { endOfDay, format, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
 import {
   addDaysToDateString,
@@ -40,6 +40,7 @@ export interface DashboardSummary {
     amount: number;
     loanDate: string;
   }[];
+  todayInvestmentsCount: number;
   activeLoansCount: number;
   completedLoansCount: number;
   activePeopleCount: number;
@@ -54,50 +55,260 @@ export interface DashboardSummary {
     totalOutstanding: number; // in paise
     activeLoansCount: number;
   }[];
-  loanDueNotifications: Awaited<ReturnType<typeof getLoanDueNotifications>>;
+  loanDueNotifications: Awaited<ReturnType<typeof getLoanDueNotificationsSummary>>;
 }
 
-export async function getLoanDueNotifications() {
+type LoanDueNotification = {
+  id: string;
+  loanId: string;
+  personId: string;
+  personName: string;
+  tamilName: string | null;
+  loanAmount: number;
+  remainingAmount: number;
+  expectedEndDate: string;
+  daysUntilDue: number;
+};
+
+type LoanDueCategory = 'overdue' | 'dueToday' | 'dueTomorrow' | 'dueSoon';
+
+interface LoanDueNotificationGroup {
+  count: number;
+  totalRemaining: number;
+  items: LoanDueNotification[];
+}
+
+interface LoanDueNotificationsSummary {
+  totalCount: number;
+  overdue: LoanDueNotificationGroup;
+  dueToday: LoanDueNotificationGroup;
+  dueTomorrow: LoanDueNotificationGroup;
+  dueSoon: LoanDueNotificationGroup;
+}
+
+function createDueLoansQuery(alertWindowEndDate: string) {
+  const remainingAmount = sql<number>`
+    GREATEST(0, ${loans.loanAmount} - COALESCE(SUM(${collections.amount}), 0))
+  `;
+
+  return db
+    .select({
+      loanId: sql<string>`${loans.id}`.as('loan_id'),
+      personId: sql<string>`${people.id}`.as('person_id'),
+      personName: sql<string>`${people.fullName}`.as('person_name'),
+      tamilName: sql<string | null>`${people.tamilName}`.as('tamil_name'),
+      loanAmount: sql<number>`${loans.loanAmount}`.as('loan_amount'),
+      remainingAmount: remainingAmount.as('remaining_amount'),
+      expectedEndDate: sql<string | null>`${loans.expectedEndDate}`.as(
+        'expected_end_date'
+      ),
+    })
+    .from(loans)
+    .innerJoin(people, eq(people.id, loans.personId))
+    .leftJoin(collections, eq(collections.loanId, loans.id))
+    .where(
+      and(
+        eq(loans.status, 'ACTIVE'),
+        lte(loans.expectedEndDate, alertWindowEndDate)
+      )
+    )
+    .groupBy(
+      loans.id,
+      people.id,
+      people.fullName,
+      people.tamilName,
+      loans.loanAmount,
+      loans.expectedEndDate
+    )
+    .having(gt(remainingAmount, 0))
+    .as('due_loans');
+}
+
+function mapDueLoan(item: {
+  loanId: string;
+  personId: string;
+  personName: string;
+  tamilName: string | null;
+  loanAmount: number;
+  remainingAmount: number;
+  expectedEndDate: string | null;
+}, todayDate: string): LoanDueNotification {
+  return {
+    id: item.loanId,
+    loanId: item.loanId,
+    personId: item.personId,
+    personName: item.personName,
+    tamilName: item.tamilName,
+    loanAmount: Number(item.loanAmount),
+    remainingAmount: Number(item.remainingAmount),
+    expectedEndDate: item.expectedEndDate || todayDate,
+    daysUntilDue: getRemainingDaysForDate(item.expectedEndDate, new Date()),
+  };
+}
+
+function getDueCategoryExpression(
+  dueLoans: ReturnType<typeof createDueLoansQuery>,
+  today: string
+) {
+  const tomorrow = addDaysToDateString(today, 1) || today;
+  const dayAfterWindow =
+    addDaysToDateString(today, LOAN_EXPIRY_ALERT_DAYS) || today;
+  return sql<LoanDueCategory | 'outsideWindow'>`
+    CASE
+      WHEN ${dueLoans.expectedEndDate} < ${today} THEN 'overdue'
+      WHEN ${dueLoans.expectedEndDate} = ${today} THEN 'dueToday'
+      WHEN ${dueLoans.expectedEndDate} = ${tomorrow} THEN 'dueTomorrow'
+      WHEN ${dueLoans.expectedEndDate} <= ${dayAfterWindow} THEN 'dueSoon'
+      ELSE 'outsideWindow'
+    END
+  `;
+}
+
+function emptyDueGroup(): LoanDueNotificationGroup {
+  return { count: 0, totalRemaining: 0, items: [] };
+}
+
+export async function getLoanDueNotificationsSummary(): Promise<LoanDueNotificationsSummary> {
   assertDbConfigured();
   await ensureDbInitialized();
 
   const todayDate = getTodayDateString();
   const alertWindowEndDate =
     addDaysToDateString(todayDate, LOAN_EXPIRY_ALERT_DAYS) || todayDate;
+  const dueLoans = createDueLoansQuery(alertWindowEndDate);
+  const category = getDueCategoryExpression(dueLoans, todayDate);
+  const tomorrow = addDaysToDateString(todayDate, 1) || todayDate;
+  const dayAfterWindow =
+    addDaysToDateString(todayDate, LOAN_EXPIRY_ALERT_DAYS) || todayDate;
+  const rankedDueLoans = db
+    .select({
+      loanId: sql<string>`${dueLoans.loanId}`.as('loan_id'),
+      personId: sql<string>`${dueLoans.personId}`.as('person_id'),
+      personName: sql<string>`${dueLoans.personName}`.as('person_name'),
+      tamilName: sql<string | null>`${dueLoans.tamilName}`.as('tamil_name'),
+      loanAmount: sql<number>`${dueLoans.loanAmount}`.as('loan_amount'),
+      remainingAmount: sql<number>`${dueLoans.remainingAmount}`.as(
+        'remaining_amount'
+      ),
+      expectedEndDate: sql<string | null>`${dueLoans.expectedEndDate}`.as(
+        'expected_end_date'
+      ),
+      category: category.as('category'),
+      rowNumber: sql<number>`
+        ROW_NUMBER() OVER (
+          PARTITION BY ${category}
+          ORDER BY ${dueLoans.expectedEndDate}, ${dueLoans.loanId}
+        )
+      `.as('row_number'),
+    })
+    .from(dueLoans)
+    .as('ranked_due_loans');
 
   try {
-    const rows = await db
-      .select({
-        loanId: loans.id,
-        personId: people.id,
-        personName: people.fullName,
-        tamilName: people.tamilName,
-        loanAmount: loans.loanAmount,
-        remainingAmount: sql<number>`GREATEST(0, ${loans.loanAmount} - COALESCE((SELECT SUM(${collections.amount}) FROM ${collections} WHERE ${collections.loanId} = ${loans.id}), 0))`,
-        expectedEndDate: loans.expectedEndDate,
-      })
-      .from(loans)
-      .innerJoin(people, eq(people.id, loans.personId))
-      .where(
-        and(
-          eq(loans.status, 'ACTIVE'),
-          lte(loans.expectedEndDate, alertWindowEndDate),
-          sql`(${loans.loanAmount} - COALESCE((SELECT SUM(${collections.amount}) FROM ${collections} WHERE ${collections.loanId} = ${loans.id}), 0)) > 0`
-        )
-      )
-      .orderBy(loans.expectedEndDate);
+    const [summaryRows, topRows] = await Promise.all([
+      db
+        .select({
+          overdueCount: sql<number>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} < ${todayDate} THEN 1 ELSE 0 END), 0)`,
+          overdueRemaining: sql<string>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} < ${todayDate} THEN ${dueLoans.remainingAmount} ELSE 0 END), 0)`,
+          dueTodayCount: sql<number>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} = ${todayDate} THEN 1 ELSE 0 END), 0)`,
+          dueTodayRemaining: sql<string>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} = ${todayDate} THEN ${dueLoans.remainingAmount} ELSE 0 END), 0)`,
+          dueTomorrowCount: sql<number>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} = ${tomorrow} THEN 1 ELSE 0 END), 0)`,
+          dueTomorrowRemaining: sql<string>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} = ${tomorrow} THEN ${dueLoans.remainingAmount} ELSE 0 END), 0)`,
+          dueSoonCount: sql<number>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} > ${tomorrow} AND ${dueLoans.expectedEndDate} <= ${dayAfterWindow} THEN 1 ELSE 0 END), 0)`,
+          dueSoonRemaining: sql<string>`COALESCE(SUM(CASE WHEN ${dueLoans.expectedEndDate} > ${tomorrow} AND ${dueLoans.expectedEndDate} <= ${dayAfterWindow} THEN ${dueLoans.remainingAmount} ELSE 0 END), 0)`,
+        })
+        .from(dueLoans),
+      db
+        .select({
+          loanId: rankedDueLoans.loanId,
+          personId: rankedDueLoans.personId,
+          personName: rankedDueLoans.personName,
+          tamilName: rankedDueLoans.tamilName,
+          loanAmount: rankedDueLoans.loanAmount,
+          remainingAmount: rankedDueLoans.remainingAmount,
+          expectedEndDate: rankedDueLoans.expectedEndDate,
+          category: rankedDueLoans.category,
+        })
+        .from(rankedDueLoans)
+        .where(lte(rankedDueLoans.rowNumber, 3))
+        .orderBy(rankedDueLoans.expectedEndDate, rankedDueLoans.loanId),
+    ]);
+    const result: LoanDueNotificationsSummary = {
+      totalCount: 0,
+      overdue: emptyDueGroup(),
+      dueToday: emptyDueGroup(),
+      dueTomorrow: emptyDueGroup(),
+      dueSoon: emptyDueGroup(),
+    };
 
-    return rows.map((item) => ({
-      id: item.loanId,
-      loanId: item.loanId,
-      personId: item.personId,
-      personName: item.personName,
-      tamilName: item.tamilName,
-      loanAmount: Number(item.loanAmount),
-      remainingAmount: Number(item.remainingAmount),
-      expectedEndDate: item.expectedEndDate || todayDate,
-      daysUntilDue: getRemainingDaysForDate(item.expectedEndDate, new Date()),
-    }));
+    const summary = summaryRows[0];
+    result.overdue.count = Number(summary?.overdueCount ?? 0);
+    result.overdue.totalRemaining = Number(summary?.overdueRemaining ?? 0);
+    result.dueToday.count = Number(summary?.dueTodayCount ?? 0);
+    result.dueToday.totalRemaining = Number(summary?.dueTodayRemaining ?? 0);
+    result.dueTomorrow.count = Number(summary?.dueTomorrowCount ?? 0);
+    result.dueTomorrow.totalRemaining = Number(summary?.dueTomorrowRemaining ?? 0);
+    result.dueSoon.count = Number(summary?.dueSoonCount ?? 0);
+    result.dueSoon.totalRemaining = Number(summary?.dueSoonRemaining ?? 0);
+    result.totalCount =
+      result.overdue.count +
+      result.dueToday.count +
+      result.dueTomorrow.count +
+      result.dueSoon.count;
+
+    for (const row of topRows) {
+      if (row.category === 'outsideWindow') continue;
+      result[row.category].items.push(mapDueLoan(row, todayDate));
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Database query failed in getLoanDueNotificationsSummary:', err);
+    throw err;
+  }
+}
+
+export async function getLoanDueNotifications(page = 1, pageSize = 50) {
+  assertDbConfigured();
+  await ensureDbInitialized();
+
+  const todayDate = getTodayDateString();
+  const alertWindowEndDate =
+    addDaysToDateString(todayDate, LOAN_EXPIRY_ALERT_DAYS) || todayDate;
+  const dueLoans = createDueLoansQuery(alertWindowEndDate);
+  const requestedPage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
+
+  try {
+    const [countRows, pageRows] = await Promise.all([
+      db.select({ count: sql<number>`COUNT(*)` }).from(dueLoans),
+      db
+        .select()
+        .from(dueLoans)
+        .orderBy(asc(dueLoans.expectedEndDate), asc(dueLoans.loanId))
+        .limit(safePageSize)
+        .offset((requestedPage - 1) * safePageSize),
+    ]);
+    const totalCount = Number(countRows[0]?.count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalCount / safePageSize));
+    const currentPage = Math.min(requestedPage, totalPages);
+    const rows =
+      currentPage === requestedPage
+        ? pageRows
+        : await db
+            .select()
+            .from(dueLoans)
+            .orderBy(asc(dueLoans.expectedEndDate), asc(dueLoans.loanId))
+            .limit(safePageSize)
+            .offset((currentPage - 1) * safePageSize);
+
+    return {
+      items: rows.map((row) => mapDueLoan(row, todayDate)),
+      totalCount,
+      currentPage,
+      totalPages,
+      pageSize: safePageSize,
+    };
   } catch (err) {
     console.error('Database query failed in getLoanDueNotifications:', err);
     throw err;
@@ -163,6 +374,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
           week: sql<string>`COALESCE(SUM(CASE WHEN ${loans.loanDate} >= ${weekStartDate} AND ${loans.loanDate} <= ${todayDate} THEN ${loans.loanAmount} ELSE 0 END), 0)`,
           month: sql<string>`COALESCE(SUM(CASE WHEN ${loans.loanDate} >= ${monthStartDate} AND ${loans.loanDate} <= ${todayDate} THEN ${loans.loanAmount} ELSE 0 END), 0)`,
           year: sql<string>`COALESCE(SUM(CASE WHEN ${loans.loanDate} >= ${yearStartDate} AND ${loans.loanDate} <= ${todayDate} THEN ${loans.loanAmount} ELSE 0 END), 0)`,
+          todayCount: sql<number>`COALESCE(SUM(CASE WHEN ${loans.loanDate} = ${todayDate} THEN 1 ELSE 0 END), 0)`,
         })
         .from(loans);
       const todayInvestmentsQuery = db
@@ -176,7 +388,11 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         .from(loans)
         .innerJoin(people, eq(people.id, loans.personId))
         .where(eq(loans.loanDate, todayDate))
-        .orderBy(desc(loans.createdAt), desc(loans.id));
+        .orderBy(desc(loans.createdAt), desc(loans.id))
+        .limit(25);
+      const outstandingBalance = sql<number>`
+        ${loanTotals.totalLent} - COALESCE(${collectionTotals.totalCollected}, 0)
+      `;
       const peopleSummaryQuery = db
         .select({
           id: people.id,
@@ -186,11 +402,16 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
           totalLent: loanTotals.totalLent,
           totalCollected: sql<string>`COALESCE(${collectionTotals.totalCollected}, 0)`,
           activeLoansCount: loanTotals.activeLoansCount,
+          totalOutstanding: outstandingBalance,
+          outstandingPeopleCount: sql<number>`COUNT(*) OVER()`,
         })
         .from(loanTotals)
         .innerJoin(people, eq(people.id, loanTotals.personId))
-        .leftJoin(collectionTotals, eq(collectionTotals.personId, people.id));
-      const periodRowsQuery = db
+        .leftJoin(collectionTotals, eq(collectionTotals.personId, people.id))
+        .where(gt(outstandingBalance, 0))
+        .orderBy(desc(outstandingBalance), people.fullName, people.id)
+        .limit(10);
+      const periodRowsQuery = (from: Date, to: Date) => db
         .select({
           id: collections.id,
           loanId: collections.loanId,
@@ -210,11 +431,28 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         .leftJoin(loans, eq(loans.id, collections.loanId))
         .where(
           and(
+            gte(collections.collectedAt, from),
+            lte(collections.collectedAt, to)
+          )
+        )
+        .orderBy(desc(collections.collectedAt), desc(collections.id))
+        .limit(25);
+      const periodSummaryQuery = db
+        .select({
+          todayTotal: sql<string>`COALESCE(SUM(CASE WHEN ${collections.collectedAt} >= ${todayStart} AND ${collections.collectedAt} <= ${todayEnd} THEN ${collections.amount} ELSE 0 END), 0)`,
+          todayCount: sql<number>`COALESCE(SUM(CASE WHEN ${collections.collectedAt} >= ${todayStart} AND ${collections.collectedAt} <= ${todayEnd} THEN 1 ELSE 0 END), 0)`,
+          weekTotal: sql<string>`COALESCE(SUM(CASE WHEN ${collections.collectedAt} >= ${weekStart} AND ${collections.collectedAt} <= ${now} THEN ${collections.amount} ELSE 0 END), 0)`,
+          weekCount: sql<number>`COALESCE(SUM(CASE WHEN ${collections.collectedAt} >= ${weekStart} AND ${collections.collectedAt} <= ${now} THEN 1 ELSE 0 END), 0)`,
+          monthTotal: sql<string>`COALESCE(SUM(CASE WHEN ${collections.collectedAt} >= ${monthStart} AND ${collections.collectedAt} <= ${now} THEN ${collections.amount} ELSE 0 END), 0)`,
+          monthCount: sql<number>`COALESCE(SUM(CASE WHEN ${collections.collectedAt} >= ${monthStart} AND ${collections.collectedAt} <= ${now} THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(collections)
+        .where(
+          and(
             gte(collections.collectedAt, earliestPeriodStart),
             lte(collections.collectedAt, todayEnd)
           )
-        )
-        .orderBy(desc(collections.collectedAt), desc(collections.id));
+        );
 
       const [
         loanSummaryRows,
@@ -222,7 +460,10 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         investmentSummaryRows,
         todayInvestments,
         peopleSummaryRows,
-        periodRows,
+        todayRows,
+        weekRows,
+        monthRows,
+        periodSummaryRows,
         loanDueNotifications,
       ] =
         await Promise.all([
@@ -231,8 +472,11 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
           investmentSummaryQuery,
           todayInvestmentsQuery,
           peopleSummaryQuery,
-          periodRowsQuery,
-          getLoanDueNotifications(),
+          periodRowsQuery(todayStart, todayEnd),
+          periodRowsQuery(weekStart, now),
+          periodRowsQuery(monthStart, now),
+          periodSummaryQuery,
+          getLoanDueNotificationsSummary(),
         ]);
       const loanSummary = loanSummaryRows[0];
       const collectionSummary = collectionSummaryRows[0];
@@ -243,7 +487,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       const activeLoansCount = Number(loanSummary?.activeLoansCount ?? 0);
       const completedLoansCount = Number(loanSummary?.completedLoansCount ?? 0);
 
-      const mapCollection = (row: (typeof periodRows)[number]) => ({
+      const mapCollection = (row: (typeof monthRows)[number]) => ({
         id: row.id,
         loanId: row.loanId,
         personId: row.personId,
@@ -257,31 +501,23 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         loanAmount: Number(row.loanAmount),
         loanDate: row.loanDate,
       });
-      const todayRows = periodRows.filter(
-        (row) => row.collectedAt >= todayStart && row.collectedAt <= todayEnd
-      );
-      const weekRows = periodRows.filter(
-        (row) => row.collectedAt >= weekStart && row.collectedAt <= now
-      );
-      const monthRows = periodRows.filter(
-        (row) => row.collectedAt >= monthStart && row.collectedAt <= now
-      );
       const todayItems = todayRows.map(mapCollection);
       const weekItems = weekRows.map(mapCollection);
       const monthItems = monthRows.map(mapCollection);
+      const periodSummary = periodSummaryRows[0];
       const todayCollections = {
-        totalCollectedToday: todayItems.reduce((sum, item) => sum + item.amount, 0),
-        count: todayItems.length,
+        totalCollectedToday: Number(periodSummary?.todayTotal ?? 0),
+        count: Number(periodSummary?.todayCount ?? 0),
         items: todayItems,
       };
       const weekCollections = {
-        totalCollected: weekItems.reduce((sum, item) => sum + item.amount, 0),
-        count: weekItems.length,
+        totalCollected: Number(periodSummary?.weekTotal ?? 0),
+        count: Number(periodSummary?.weekCount ?? 0),
         items: weekItems,
       };
       const monthCollections = {
-        totalCollected: monthItems.reduce((sum, item) => sum + item.amount, 0),
-        count: monthItems.length,
+        totalCollected: Number(periodSummary?.monthTotal ?? 0),
+        count: Number(periodSummary?.monthCount ?? 0),
         items: monthItems,
       };
       const outstandingPeopleList = peopleSummaryRows
@@ -290,19 +526,14 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
           fullName: person.fullName,
           tamilName: person.tamilName,
           phone: person.phone,
-          totalOutstanding: Math.max(
-            0,
-            Number(person.totalLent) - Number(person.totalCollected)
-          ),
+          totalOutstanding: Number(person.totalOutstanding),
           activeLoansCount: Number(person.activeLoansCount),
-        }))
-        .filter((person) => person.totalOutstanding > 0)
-        .sort((a, b) => b.totalOutstanding - a.totalOutstanding);
+        }));
 
       const collectedToday = todayCollections.totalCollectedToday;
       const collectedThisWeek = weekCollections.totalCollected;
       const collectedThisMonth = monthCollections.totalCollected;
-      const activePeopleCount = outstandingPeopleList.length;
+      const activePeopleCount = Number(peopleSummaryRows[0]?.outstandingPeopleCount ?? 0);
 
       return {
         totalLent,
@@ -322,6 +553,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
           amount: Number(loan.amount),
           loanDate: loan.loanDate,
         })),
+        todayInvestmentsCount: Number(investmentSummary?.todayCount ?? 0),
         activeLoansCount,
         completedLoansCount,
         activePeopleCount,

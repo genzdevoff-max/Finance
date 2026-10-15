@@ -18,8 +18,8 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   const page =
     Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const pageSize = 50;
-  const notifications = await getNotifications(pageSize, (page - 1) * pageSize);
-  const [totalCount, unreadCount] = await Promise.all([
+  const [notifications, totalCount, unreadCount] = await Promise.all([
+    getNotifications(pageSize, (page - 1) * pageSize),
     getNotificationCount(),
     getUnreadNotificationsCount(),
   ]);

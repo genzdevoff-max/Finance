@@ -12,14 +12,20 @@ import { format } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 
-async function DashboardContent({ personId }: { personId?: string }) {
+async function DashboardContent({
+  personId,
+  loanPage,
+}: {
+  personId?: string;
+  loanPage: number;
+}) {
   let summary = null;
   let person = null;
   let errorMsg: string | null = null;
 
   try {
     if (personId) {
-      person = await getPersonById(personId);
+      person = await getPersonById(personId, loanPage);
       if (!person) errorMsg = 'The selected person could not be found.';
     } else {
       summary = await getDashboardSummary();
@@ -30,7 +36,7 @@ async function DashboardContent({ personId }: { personId?: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 sm:space-y-5">
+    <div className="mx-auto max-w-6xl space-y-4 p-4 sm:space-y-5 sm:p-6 lg:p-8">
       <PersonDashboardSelector
         selectedPerson={
           person ? { id: person.id, fullName: person.fullName, phone: person.phone } : null
@@ -64,7 +70,7 @@ async function DashboardContent({ personId }: { personId?: string }) {
 
 function DashboardFallback() {
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 sm:space-y-5" aria-label="Loading dashboard" role="status">
+    <div className="mx-auto max-w-6xl space-y-4 p-4 sm:space-y-5 sm:p-6 lg:p-8" aria-label="Loading dashboard" role="status">
       <Skeleton className="h-44 w-full rounded-3xl" />
       <Skeleton className="h-14 w-full rounded-xl" />
       <div className="grid grid-cols-2 gap-3">
@@ -79,11 +85,14 @@ function DashboardFallback() {
 }
 
 interface DashboardPageProps {
-  searchParams: Promise<{ personId?: string }>;
+  searchParams: Promise<{ personId?: string; loanPage?: string }>;
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { personId } = await searchParams;
+  const { personId, loanPage: requestedLoanPage } = await searchParams;
+  const parsedLoanPage = Number(requestedLoanPage);
+  const loanPage =
+    Number.isSafeInteger(parsedLoanPage) && parsedLoanPage > 0 ? parsedLoanPage : 1;
   const todayFormatted = format(new Date(), 'EEEE, dd MMMM');
 
   return (
@@ -93,7 +102,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         subtitle={todayFormatted}
       />
       <Suspense fallback={<DashboardFallback />}>
-        <DashboardContent personId={personId} />
+        <DashboardContent personId={personId} loanPage={loanPage} />
       </Suspense>
     </div>
   );

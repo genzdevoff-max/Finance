@@ -27,7 +27,7 @@ export default async function EditPersonPage({ params }: EditPersonPageProps) {
         backHref={`/people/${personId}`}
       />
 
-      <div className="p-4">
+      <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
         <PersonForm
           personId={person.id}
           initialData={{
