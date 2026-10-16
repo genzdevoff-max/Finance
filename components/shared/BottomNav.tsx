@@ -2,11 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, History, Plus, BellRing } from 'lucide-react';
+import { LayoutDashboard, Users, History, Plus, BellRing, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logoutAction } from '@/app/login/actions';
 
 export function BottomNav() {
   const pathname = usePathname();
+
+  if (pathname === '/login' || pathname === '/register') {
+    return null;
+  }
 
   const navItems = [
     {
@@ -120,6 +125,17 @@ export function BottomNav() {
           />
           <span className="mt-1">Notifications</span>
         </Link>
+
+        <form action={logoutAction} className="flex flex-1 justify-center">
+          <button
+            type="submit"
+            aria-label="Sign out"
+            className="flex flex-col items-center justify-center py-1 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-900"
+          >
+            <LogOut className="h-6 w-6" />
+            <span className="mt-1">Sign out</span>
+          </button>
+        </form>
       </div>
     </nav>
   );

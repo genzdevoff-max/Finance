@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { isAuthenticated } from '@/lib/auth/server';
 import { createPerson, updatePerson, deletePerson } from '@/lib/services/people.service';
 import { personSchema } from '@/lib/validations/person';
 
@@ -11,6 +12,8 @@ export async function createPersonAction(data: {
   address?: string | null;
   notes?: string | null;
 }) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     const validated = personSchema.parse(data);
     const newPerson = await createPerson(validated);
@@ -44,6 +47,8 @@ export async function updatePersonAction(
     notes?: string | null;
   }
 ) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     const validated = personSchema.parse(data);
     const updated = await updatePerson(id, validated);
@@ -69,6 +74,8 @@ export async function updatePersonAction(
 }
 
 export async function deletePersonAction(id: string) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     await deletePerson(id);
     revalidatePath('/people');

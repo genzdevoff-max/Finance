@@ -1,6 +1,5 @@
-const CACHE_NAME = 'loan-tracker-v3';
+const CACHE_NAME = 'loan-tracker-v4';
 const STATIC_ASSETS = [
-  '/',
   '/manifest.webmanifest',
   '/icons/finance-icon-192-v2.png',
   '/icons/finance-icon-512-v2.png',
@@ -61,7 +60,16 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(() => {
-        return caches.match(event.request);
+        const url = new URL(event.request.url);
+        if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
+          return caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            return Response.error();
+          });
+        }
+        return Response.error();
       })
   );
 });

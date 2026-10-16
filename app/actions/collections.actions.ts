@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { isAuthenticated } from '@/lib/auth/server';
 import {
   createCollection,
   updateCollection,
@@ -18,6 +19,8 @@ export async function createCollectionAction(data: {
   collectedAt?: string | null;
   notes?: string | null;
 }) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     const validated = collectionSchema.parse(data);
     const amountPaise = rupeesToPaise(validated.amount);
@@ -71,6 +74,8 @@ export async function updateCollectionAction(
     personId?: string;
   }
 ) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     if (!data.amount || data.amount <= 0) {
       return { success: false, error: 'Collection amount must be greater than ₹0.' };
@@ -119,6 +124,8 @@ export async function deleteCollectionAction(
   collectionId: string,
   meta?: { loanId?: string; personId?: string }
 ) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     await deleteCollection(collectionId);
 

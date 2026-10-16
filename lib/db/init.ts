@@ -132,6 +132,37 @@ export async function ensureTablesExist(pool: mysql.Pool): Promise<void> {
         'CREATE INDEX notifications_created_at_id_idx ON notifications (created_at, id)'
       );
     }
+
+    // 5. users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(36) PRIMARY KEY,
+        username VARCHAR(191) NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+        INDEX users_username_idx (username)
+      );
+    `);
+
+    // Migrate or seed initial user from env if users table is currently empty
+    try {
+      const [userRows] = await pool.query<mysql.RowDataPacket[]>('SELECT COUNT(*) as count FROM users');
+      const userCount = Number(userRows[0]?.count || 0);
+      if (userCount === 0 && process.env.AUTH_USERNAME && process.env.AUTH_PASSWORD_HASH) {
+        const initialId = crypto.randomUUID();
+        await pool.query(
+          'INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)',
+          [
+            initialId,
+            process.env.AUTH_USERNAME.trim(),
+            process.env.AUTH_PASSWORD_HASH.trim().replaceAll('\\$', '$'),
+          ]
+        );
+      }
+    } catch (userSeedError) {
+      console.warn('Could not seed initial user into users table:', userSeedError);
+    }
   } catch (err) {
     console.error('Could not initialize database tables:', err);
     throw err;

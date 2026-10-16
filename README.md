@@ -10,7 +10,7 @@ Designed to track financial accounts, multiple separate credit/loan records per 
 
 - **Responsive Web & Mobile Experience**: Works in modern desktop and mobile browsers, keeps the emerald/slate theme across screen sizes, and installs on Android and iOS as a standalone PWA.
 - **Adaptive Navigation**: Desktop uses a persistent sidebar; tablet and mobile use compact bottom navigation.
-- **Single-User, Zero-Friction**: No login or authentication walls for v1. Open the app and record collections immediately.
+- **Single-Owner Login**: Username/password sign-in protects application pages, APIs, and server actions with an HTTP-only signed session cookie.
 - **High-Speed Collection Flow**:
   - Open app &rarr; Tap "+ Collect" &rarr; Select Borrower &rarr; Select Loan &rarr; Enter Amount &rarr; Confirm &rarr; Done.
   - Live preview of remaining balance before recording payment.
@@ -72,9 +72,30 @@ Create a `.env.local` file in the root directory:
 ```env
 # TiDB Cloud MySQL connection string
 DATABASE_URL=mysql://<USERNAME>:<PASSWORD>@<HOST>:4000/lonetracker?ssl=true
+
+# Single-owner authentication
+AUTH_USERNAME=your-owner-username
+AUTH_PASSWORD_HASH=<generated-with-npm-run-auth-hash>
+AUTH_SESSION_SECRET=<random-secret-of-at-least-32-bytes>
 ```
 
 An example template is available in `.env.example`.
+
+Generate a password hash in a terminal (the password is entered without echoing):
+
+```bash
+npm run auth:hash
+```
+
+Copy the printed `AUTH_PASSWORD_HASH` into the server environment. Generate a separate session secret, for example:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Keep all three authentication values server-side and out of source control. Rotating
+`AUTH_SESSION_SECRET` invalidates all existing sessions. In production, serve the app
+only over HTTPS and configure platform-level rate limiting for sign-in requests.
 
 ---
 
@@ -189,16 +210,18 @@ npm run start
 
 ## 🔒 Security & Scope Limitations
 
-- **Single-User Scope**: This application is intentionally single-user with no authentication for Version 1. It is meant to be used on the owner's personal device.
-- **Deployment Recommendation**: For internet deployments, consider adding Vercel Deployment Protection (Password Protection) or Cloudflare Access until user authentication is introduced.
-- **Database Safety**: Drizzle queries are parameterized, preventing SQL injection vulnerabilities. All financial mutations execute in controlled server actions with mathematical bounds checking.
+- **Single-Owner Scope**: This application has one owner login and one shared dataset; it does not provide separate accounts or per-user data isolation.
+- **Authentication**: Protected pages, APIs, and Server Actions require a signed, 12-hour, HTTP-only, `SameSite=Strict` cookie. Passwords are checked against salted scrypt hashes. Configure all three authentication variables before deployment; the app fails closed if they are missing or invalid.
+- **Transport and caching**: Use HTTPS in production. TiDB/MySQL TLS certificate validation is enabled. Protected responses are marked `no-store`, and the service worker does not cache application pages or API responses.
+- **Operational protection**: Use deployment-level sign-in rate limiting, restrict database credentials/network access, and use the database provider's encryption-at-rest and backup protections. Authentication reduces unauthorized access but cannot guarantee that data will never be stolen; compromised devices, weak/reused passwords, exposed deployment secrets, or application vulnerabilities can still expose data.
+- **Database safety**: Drizzle queries are parameterized, and financial mutations retain their existing validation and bounds checking.
 
 ---
 
 ## 🧭 Future-Ready Architecture
 
 The code separates database queries (`lib/db/`), validation (`lib/validations/`), services (`lib/services/`), Server Actions (`app/actions/`), and UI components (`components/`). This makes it straightforward to add future capabilities without refactoring core logic:
-- User authentication & multi-tenant tenancy
+- Multi-user tenancy and per-account data isolation
 - Cloud backup & CSV / Excel export
 - WhatsApp payment receipts / reminders
 - PDF statement generation

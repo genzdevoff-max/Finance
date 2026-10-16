@@ -2,10 +2,13 @@ import {
   createHistoryWorkbook,
   historyWorkbookFileName,
 } from '@/lib/reports/history-workbook';
+import { isAuthenticated } from '@/lib/auth/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  if (!(await isAuthenticated())) return new Response('Unauthorized.', { status: 401 });
+
   const url = new URL(request.url);
   const personId = url.searchParams.get('personId') || undefined;
   const startDate = url.searchParams.get('startDate') || undefined;

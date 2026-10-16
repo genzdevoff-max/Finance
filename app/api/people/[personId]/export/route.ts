@@ -1,3 +1,5 @@
+import { isAuthenticated } from '@/lib/auth/server';
+
 export const dynamic = 'force-dynamic';
 
 interface ExportRouteContext {
@@ -5,6 +7,8 @@ interface ExportRouteContext {
 }
 
 export async function GET(request: Request, { params }: ExportRouteContext) {
+  if (!(await isAuthenticated())) return new Response('Unauthorized.', { status: 401 });
+
   const { personId } = await params;
   const exportUrl = new URL('/api/history/export', request.url);
   exportUrl.searchParams.set('personId', personId);

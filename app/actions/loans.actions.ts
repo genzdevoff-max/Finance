@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { isAuthenticated } from '@/lib/auth/server';
 import { createLoan, deleteLoan, updateLoanSchedule } from '@/lib/services/loans.service';
 import { loanSchema } from '@/lib/validations/loan';
 import { rupeesToPaise } from '@/lib/utils/currency';
@@ -17,6 +18,8 @@ export async function createLoanAction(data: {
   installmentFrequency: InstallmentFrequency;
   notes?: string | null;
 }) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     const validated = loanSchema.parse(data);
 
@@ -55,6 +58,8 @@ export async function createLoanAction(data: {
 }
 
 export async function deleteLoanAction(loanId: string, personId: string) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     await deleteLoan(loanId);
     revalidatePath('/dashboard');
@@ -74,6 +79,8 @@ export async function updateLoanScheduleAction(data: {
   installmentFrequency: InstallmentFrequency;
   durationDays?: number | null;
 }) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     const validated = z
       .object({

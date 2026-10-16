@@ -1,8 +1,11 @@
 import { getPeopleWithActiveLoansForCollection } from '@/lib/services/loans.service';
+import { isAuthenticated } from '@/lib/auth/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  if (!(await isAuthenticated())) return Response.json({ error: 'Unauthorized.' }, { status: 401 });
+
   const params = new URL(request.url).searchParams;
   const query = params.get('q')?.trim() ?? '';
   const personId = params.get('personId')?.trim();

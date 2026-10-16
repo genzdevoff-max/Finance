@@ -6,10 +6,12 @@ import {
   BellRing,
   History,
   LayoutDashboard,
+  LogOut,
   Plus,
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logoutAction } from '@/app/login/actions';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -20,6 +22,10 @@ const navItems = [
 
 export function DesktopNav() {
   const pathname = usePathname();
+
+  if (pathname === '/login' || pathname === '/register') {
+    return null;
+  }
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
@@ -71,6 +77,15 @@ export function DesktopNav() {
           <Plus className="h-5 w-5" />
           Add Collection
         </Link>
+        <form action={logoutAction} className="mt-2">
+          <button
+            type="submit"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </form>
       </div>
     </aside>
   );

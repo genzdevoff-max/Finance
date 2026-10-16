@@ -1,12 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { isAuthenticated } from '@/lib/auth/server';
 import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/lib/services/notifications.service';
 
 export async function markNotificationReadAction(id: string) {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     await markNotificationRead(id);
     revalidatePath('/notifications');
@@ -22,6 +25,8 @@ export async function markNotificationReadAction(id: string) {
 }
 
 export async function markAllNotificationsReadAction() {
+  if (!(await isAuthenticated())) return { success: false, error: 'Unauthorized.' };
+
   try {
     await markAllNotificationsRead();
     revalidatePath('/notifications');

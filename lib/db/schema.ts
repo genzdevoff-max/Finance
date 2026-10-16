@@ -160,3 +160,25 @@ export type NewLoan = typeof loans.$inferInsert;
 
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;
+
+/**
+ * USERS TABLE
+ * Stores registered users and their credentials.
+ */
+export const users = mysqlTable(
+  'users',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    username: varchar('username', { length: 191 }).notNull().unique(),
+    passwordHash: text('password_hash').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index('users_username_idx').on(table.username),
+  ]
+);
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+

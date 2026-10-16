@@ -2,11 +2,12 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Bell, Loader2 } from 'lucide-react';
 
 export function NotificationBell() {
   const pathname = usePathname();
+  const router = useRouter();
   const [unreadCount, setUnreadCount] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -16,6 +17,10 @@ export function NotificationBell() {
       if (active) setIsLoading(true);
       try {
         const response = await fetch('/api/notifications/unread-count', { cache: 'no-store' });
+        if (response.status === 401) {
+          if (active) router.replace('/login');
+          return;
+        }
         if (!response.ok) throw new Error('Unable to refresh notifications.');
         const result: { count: number } = await response.json();
         if (active) setUnreadCount(result.count);
@@ -37,7 +42,7 @@ export function NotificationBell() {
       window.clearInterval(interval);
       window.removeEventListener('notifications-updated', refreshWithLogging);
     };
-  }, [pathname]);
+  }, [pathname, router]);
 
   return (
     <Link

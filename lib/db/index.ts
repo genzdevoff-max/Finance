@@ -44,7 +44,7 @@ export function getDb(): DrizzleDb {
     global._mysqlPool ||
     mysql.createPool({
       uri: connectionString,
-      ssl: isTiDB ? { minVersion: 'TLSv1.2', rejectUnauthorized: false } : undefined,
+      ssl: isTiDB ? { minVersion: 'TLSv1.2', rejectUnauthorized: true } : undefined,
       waitForConnections: true,
       connectionLimit: process.env.NODE_ENV === 'production' ? 10 : 3,
       queueLimit: 0,
